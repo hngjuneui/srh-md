@@ -3,64 +3,206 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SRH Robotics Mechanical Design</title>
+    <title>BLE 데이터 전송</title>
     <style>
-        /* 기본 스타일 */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-        }
-
-        /* 배경과 색상 스타일 */
+        /* 전체 레이아웃 */
         body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f8f9fa;
             display: flex;
+            flex-direction: column;
             align-items: center;
-            justify-content: center;
-            height: 100vh;
-            background-color: #F0F0F5; /* 아이폰 기본 앱 배경 색상 */
+            padding: 20px;
             color: #333;
         }
 
-        /* 메인 컨테이너 */
-        .container {
-            width: 90%;
-            max-width: 400px;
-            padding: 2em;
-            background-color: #FFFFFF; /* 깔끔한 흰색 배경 */
-            border-radius: 20px;
-            text-align: center;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* 부드러운 그림자 */
-        }
-
-        /* 제목 스타일 */
         h1 {
-            font-size: 2em;
-            font-weight: 600;
-            color: #1C1C1E; /* 진한 검정 계열 */
-            margin-bottom: 0.5em;
+            font-size: 1.5em;
+            color: #007aff;
         }
 
-        /* 설명 스타일 */
-        p {
+        /* 페어링 상태 */
+        #status {
+            margin: 10px 0;
+            padding: 10px 20px;
+            background-color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            font-size: 0.9em;
+            text-align: center;
+            width: 80%;
+        }
+
+        /* 탭 버튼 */
+        .tab-button {
+            flex: 1;
+            padding: 12px;
+            margin: 5px;
+            border: none;
+            border-radius: 12px;
+            background-color: #007aff;
+            color: white;
             font-size: 1em;
-            line-height: 1.6;
-            color: #8E8E93; /* 회색 계열 */
+            font-weight: 500;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .tab-button.active {
+            background-color: #005ecb;
         }
 
-        /* 세부 텍스트 강조 스타일 */
-        .highlight {
+        /* 탭 섹션 */
+        .tab {
+            display: none;
+            width: 100%;
+            max-width: 400px;
+        }
+        
+        .tab.active {
+            display: block;
+        }
+
+        /* 입력 필드 */
+        input[type="text"] {
+            width: calc(100% - 20px);
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            font-size: 1em;
+            box-sizing: border-box;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        /* 일반 버튼 */
+        button {
+            width: 100%;
+            max-width: 400px;
+            padding: 12px;
+            margin: 5px 0;
+            border: none;
+            border-radius: 12px;
+            background-color: #007aff;
+            color: white;
+            font-size: 1em;
             font-weight: 500;
-            color: #007AFF; /* 아이폰의 기본 강조 색상 */
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #005ecb;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>SRH-MD</h1>
-        <p class="highlight">Dept. of ROBOTICS MECHANICAL DESIGN</p>
-        <p>Seoul Robotics Highschool</p>
+    <h1>BLE 기기로 데이터 전송</h1>
+    <p id="status">페어링 상태: 대기 중...</p>
+    
+    <!-- 탭 버튼 -->
+    <div style="display: flex; width: 100%; max-width: 400px;">
+        <button class="tab-button active" onclick="showTab(1)">직접 입력</button>
+        <button class="tab-button" onclick="showTab(2)">프리셋 버튼</button>
     </div>
+
+    <!-- 첫 번째 탭: 직접 입력 -->
+    <div id="tab1" class="tab active">
+        <input type="text" id="inputText" placeholder="보낼 데이터를 입력하세요">
+        <button onclick="sendData()">전송</button>
+    </div>
+
+    <!-- 두 번째 탭: 프리셋 버튼 -->
+    <div id="tab2" class="tab">
+        <input type="text" id="preset1" placeholder="프리셋 1 입력">
+        <button onclick="sendPresetData(1)">프리셋 1 전송</button>
+        <input type="text" id="preset2" placeholder="프리셋 2 입력">
+        <button onclick="sendPresetData(2)">프리셋 2 전송</button>
+        <input type="text" id="preset3" placeholder="프리셋 3 입력">
+        <button onclick="sendPresetData(3)">프리셋 3 전송</button>
+        <input type="text" id="preset4" placeholder="프리셋 4 입력">
+        <button onclick="sendPresetData(4)">프리셋 4 전송</button>
+    </div>
+
+    <script>
+        const SERVICE_UUID = 'uuid-여기에-서비스-UUID-추가';
+        let characteristic;
+
+        // BLE 페어링 함수
+        async function attemptPairing() {
+            document.getElementById('status').innerText = "페어링 시도 중...";
+
+            try {
+                const device = await navigator.bluetooth.requestDevice({
+                    filters: [{ services: [SERVICE_UUID] }]
+                });
+                
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                characteristic = await service.getCharacteristic('uuid-여기에-특성-UUID-추가');
+                
+                document.getElementById('status').innerText = "페어링 성공!";
+                console.log("BLE 기기 페어링 성공:", device.name);
+            } catch (error) {
+                document.getElementById('status').innerText = "페어링 실패: " + error;
+                console.error("페어링 오류:", error);
+            }
+        }
+
+        // 텍스트 폼 데이터 전송 함수
+        async function sendData() {
+            if (!characteristic) {
+                await attemptPairing();
+            }
+
+            const text = document.getElementById('inputText').value;
+            const encoder = new TextEncoder();
+            const data = encoder.encode(text);
+
+            try {
+                await characteristic.writeValue(data);
+                console.log("데이터 전송 완료:", text);
+            } catch (error) {
+                console.error("데이터 전송 오류:", error);
+            }
+        }
+
+        // 프리셋 데이터 전송 함수
+        async function sendPresetData(presetNumber) {
+            if (!characteristic) {
+                await attemptPairing();
+            }
+
+            const text = document.getElementById(`preset${presetNumber}`).value;
+            const encoder = new TextEncoder();
+            const data = encoder.encode(text);
+
+            try {
+                await characteristic.writeValue(data);
+                console.log(`프리셋 ${presetNumber} 데이터 전송 완료:`, text);
+            } catch (error) {
+                console.error(`프리셋 ${presetNumber} 데이터 전송 오류:`, error);
+            }
+        }
+
+        // 탭 전환 함수
+        function showTab(tabNumber) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            
+            document.getElementById(`tab${tabNumber}`).classList.add('active');
+            document.querySelectorAll('.tab-button')[tabNumber - 1].classList.add('active');
+        }
+
+        // 페이지 로드 시 자동 페어링 시도
+        window.onload = () => {
+            if (navigator.bluetooth) {
+                attemptPairing();
+            } else {
+                document.getElementById('status').innerText = "이 기기는 블루투스를 지원하지 않습니다.";
+            }
+        };
+    </script>
 </body>
 </html>
