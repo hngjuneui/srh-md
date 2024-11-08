@@ -15,7 +15,20 @@
             padding: 20px;
             color: #333;
         }
-
+        /* 화면 확대 방지 */
+        html, body {
+            touch-action: manipulation; /* 터치로 확대 방지 */
+            user-select: none; /* 텍스트 선택 방지 */
+        }
+        
+        /* 모든 요소에서 더블탭 확대 방지 */
+        * {
+            -webkit-touch-callout: none; /* 길게 눌렀을 때 메뉴 방지 */
+            -webkit-user-select: none; /* iOS 텍스트 선택 방지 */
+            -moz-user-select: none; /* Firefox 텍스트 선택 방지 */
+            -ms-user-select: none; /* IE 텍스트 선택 방지 */
+            user-select: none; /* 텍스트 선택 방지 */
+        }
         h1 {
             font-size: 1.5em;
             color: #007aff;
