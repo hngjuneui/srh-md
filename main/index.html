@@ -216,6 +216,25 @@
                 document.getElementById('status').innerText = "이 기기는 블루투스를 지원하지 않습니다.";
             }
         };
+
+    
+        // 더블탭으로 인한 확대 방지
+        document.addEventListener('touchstart', function preventZoom(event) {
+            if (event.touches.length > 1) {
+                event.preventDefault();
+            }
+        }, { passive: false });
+        
+        // iOS에서 더블탭 확대 방지
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function (event) {
+            const now = new Date().getTime();
+            if (now - lastTouchEnd <= 300) {
+                event.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
+
     </script>
 </body>
 </html>
