@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BLE 데이터 전송</title>
+    <title>BLE 웹 시리얼 통신</title>
     <style>
         /* 전체 레이아웃 */
         body {
@@ -15,6 +15,20 @@
             padding: 20px;
             color: #333;
         }
+				/* 화면 확대 방지 */
+				html, body {
+				    touch-action: manipulation; /* 터치로 확대 방지 */
+				    user-select: none; /* 텍스트 선택 방지 */
+				}
+				
+				/* 모든 요소에서 더블탭 확대 방지 */
+				* {
+				    -webkit-touch-callout: none; /* 길게 눌렀을 때 메뉴 방지 */
+				    -webkit-user-select: none; /* iOS 텍스트 선택 방지 */
+				    -moz-user-select: none; /* Firefox 텍스트 선택 방지 */
+				    -ms-user-select: none; /* IE 텍스트 선택 방지 */
+				    user-select: none; /* 텍스트 선택 방지 */
+				}
 
         h1 {
             font-size: 1.5em;
@@ -131,8 +145,8 @@
     </style>
 </head>
 <body>
-    <h1>BLE 기기로 데이터 전송</h1>
-    <p id="status">페어링 상태: 대기 중...</p>
+    <h1>BLE 웹 시리얼 통신</h1>
+    <p id="status">상태: 대기 중...</p>
     
     <!-- 탭 버튼 -->
     <div style="display: flex; width: 100%; max-width: 400px;">
@@ -140,13 +154,13 @@
         <button class="tab-button" onclick="showTab(2)">프리셋 버튼</button>
     </div>
 
-    <!-- 첫 번째 탭: 직접 입력 -->
+    <!-- 첫 번째 탭: 텍스트 입력 -->
     <div id="tab1" class="tab active">
         <input type="text" id="inputText" placeholder="보낼 데이터를 입력하세요">
         <button onclick="sendData()">전송</button>
     </div>
 
-    <!-- 두 번째 탭: 프리셋 버튼 -->
+    <!-- 두 번째 탭: 버튼 할당 -->
     <div id="tab2" class="tab">
         <div class="preset-buttons-container">
             <div class="preset-button-single">
@@ -175,7 +189,7 @@
 
         // BLE 페어링 함수
         async function attemptPairing() {
-            document.getElementById('status').innerText = "페어링 상태: 페어링 대기 중...";
+            document.getElementById('status').innerText = "상태: 페어링 대기 중...";
 
             try {
                 const device = await navigator.bluetooth.requestDevice({
@@ -186,10 +200,10 @@
                 const service = await server.getPrimaryService(SERVICE_UUID);
                 characteristic = await service.getCharacteristic('uuid-여기에-특성-UUID-추가');
                 
-                document.getElementById('status').innerText = "페어링 상태: 페어링 성공!";
+                document.getElementById('status').innerText = "상태: 페어링 성공!";
                 console.log("BLE 기기 페어링 성공:", device.name);
             } catch (error) {
-                document.getElementById('status').innerText = "페어링 상태: 페어링 대기 중...";
+                document.getElementById('status').innerText = "상태: 페어링 대기 중...";
                 console.error("페어링 오류:", error);
             }
         }
@@ -197,7 +211,7 @@
         // 텍스트 폼 데이터 전송 함수
         async function sendData() {
             if (!characteristic) {
-                document.getElementById('status').innerText = "페어링 상태: 페어링 기기가 없습니다.";
+                document.getElementById('status').innerText = "상태: 페어링 기기가 없습니다.";
                 return;
             }
 
