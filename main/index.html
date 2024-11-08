@@ -96,6 +96,38 @@
         button:hover {
             background-color: #005ecb;
         }
+
+        /* 프리셋 버튼 스타일 */
+        .preset-buttons-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+
+        .preset-button-single {
+            width: 33%;
+            margin: 10px auto;
+            text-align: center;
+        }
+
+        .preset-button-double {
+            width: 33%;
+            display: inline-block;
+            margin: 10px 1%;
+        }
+
+        /* 프리셋 입력 필드 스타일 */
+        .preset-input {
+            width: calc(100% - 20px);
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            font-size: 1em;
+            box-sizing: border-box;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+        }
     </style>
 </head>
 <body>
@@ -116,14 +148,25 @@
 
     <!-- 두 번째 탭: 프리셋 버튼 -->
     <div id="tab2" class="tab">
-        <input type="text" id="preset1" placeholder="프리셋 1 입력">
-        <button onclick="sendPresetData(1)">프리셋 1 전송</button>
-        <input type="text" id="preset2" placeholder="프리셋 2 입력">
-        <button onclick="sendPresetData(2)">프리셋 2 전송</button>
-        <input type="text" id="preset3" placeholder="프리셋 3 입력">
-        <button onclick="sendPresetData(3)">프리셋 3 전송</button>
-        <input type="text" id="preset4" placeholder="프리셋 4 입력">
-        <button onclick="sendPresetData(4)">프리셋 4 전송</button>
+        <div class="preset-buttons-container">
+            <div class="preset-button-single">
+                <button onclick="sendPresetData(1)">프리셋 1 전송</button>
+            </div>
+            <div class="preset-button-double">
+                <button onclick="sendPresetData(2)">프리셋 2 전송</button>
+            </div>
+            <div class="preset-button-double">
+                <button onclick="sendPresetData(3)">프리셋 3 전송</button>
+            </div>
+            <div class="preset-button-single">
+                <button onclick="sendPresetData(4)">프리셋 4 전송</button>
+            </div>
+            <!-- 프리셋 입력 필드 -->
+            <input type="text" id="preset1" class="preset-input" placeholder="프리셋 1 입력">
+            <input type="text" id="preset2" class="preset-input" placeholder="프리셋 2 입력">
+            <input type="text" id="preset3" class="preset-input" placeholder="프리셋 3 입력">
+            <input type="text" id="preset4" class="preset-input" placeholder="프리셋 4 입력">
+        </div>
     </div>
 
     <script>
