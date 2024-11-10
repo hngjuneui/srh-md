@@ -8,38 +8,26 @@
         /* 전체 레이아웃 */
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background-color: #f8f9fa;
+            background-color: #f2f2f7;
             display: flex;
             flex-direction: column;
             align-items: center;
             padding: 20px;
-            color: #333;
+            color: #1c1c1e;
         }
-
-        /* 화면 확대 및 텍스트 선택 방지 */
-        html, body {
-            touch-action: manipulation;
-            user-select: none;
-        }
-
-        * {
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
-        }
-
+        
         h1 {
             font-size: 1.5em;
             color: #007aff;
+            font-weight: 600;
+            margin-bottom: 10px;
         }
-
+        
         /* 페어링 상태 */
         #status {
             margin: 10px 0;
-            padding: 10px 20px;
-            background-color: #fff;
+            padding: 12px 20px;
+            background-color: #ffffff;
             border-radius: 12px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
             font-size: 0.9em;
@@ -47,59 +35,47 @@
             width: 100%;
             max-width: 400px;
         }
-
+        
         /* 탭 버튼 스타일 */
         .tab-buttons {
             display: flex;
             width: 100%;
             max-width: 400px;
-            justify-content: center;
             gap: 10px;
             margin-bottom: 15px;
         }
-
+        
         .tab-button {
             flex: 1;
             padding: 10px;
-            border-radius: 20px;
-            background-color: #e0e0e0;
-            color: #333;
+            border-radius: 16px;
+            background-color: #e5e5ea;
+            color: #1c1c1e;
             font-size: 1em;
             font-weight: 500;
             cursor: pointer;
-            border: 2px solid #007aff;
-            transition: background-color 0.3s, color 0.3s;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+            transition: background-color 0.2s ease;
         }
-
+        
         .tab-button.active {
             background-color: #007aff;
-            color: #fff;
-            border-color: #005ecb;
+            color: #ffffff;
         }
-
-        /* 탭 섹션 */
-        .tab {
-            display: none;
-            width: 100%;
-            max-width: 400px;
-        }
-
-        .tab.active {
-            display: block;
-        }
-
+        
         /* 입력 필드 */
         input[type="text"] {
             width: calc(100% - 20px);
             padding: 12px;
             margin: 10px 0;
-            border: 1px solid #ddd;
+            border: 1px solid #d1d1d6;
             border-radius: 12px;
             font-size: 1em;
             box-sizing: border-box;
+            background-color: #ffffff;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
         }
-
+        
         /* 일반 버튼 */
         button {
             width: 100%;
@@ -114,13 +90,13 @@
             font-weight: 500;
             cursor: pointer;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            transition: background-color 0.3s;
+            transition: background-color 0.3s ease;
         }
-
+        
         button:hover {
             background-color: #005ecb;
         }
-
+        
         /* 프리셋 버튼 스타일 */
         .preset-buttons-container {
             display: flex;
@@ -128,36 +104,38 @@
             align-items: center;
             width: 100%;
         }
-
+        
         .preset-button-single {
             width: 33%;
             margin: 10px auto;
             text-align: center;
         }
-
+        
         .preset-button-row {
             display: flex;
             justify-content: center;
             width: 100%;
         }
-
+        
         .preset-button-double {
             width: 33%;
             margin: 10px 5px;
             text-align: center;
         }
-
+        
         /* 프리셋 입력 필드 스타일 */
         .preset-input {
             width: calc(100% - 20px);
             padding: 12px;
             margin: 10px 0;
-            border: 1px solid #ddd;
+            border: 1px solid #d1d1d6;
             border-radius: 12px;
             font-size: 1em;
             box-sizing: border-box;
+            background-color: #ffffff;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
         }
+
     </style>
 </head>
 <body>
