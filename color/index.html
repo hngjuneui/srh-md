@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenCV 색상 감지 웹앱</title>
+    <script src="https://docs.opencv.org/4.5.1/opencv.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif, "Noto Sans KR", "Malgun Gothic"; 
+            text-align: center;
+        }
+        video { display: none; } /* 비디오 요소를 숨기고 캔버스에 렌더링 */
+        canvas { width: 100%; max-width: 480px; display: block; margin: auto; }
+        #color-result { font-size: 20px; margin-top: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h2>OpenCV 색상 감지 웹앱</h2>
+    <video id="camera" autoplay playsinline></video>
+    <canvas id="outputCanvas"></canvas>
+    <div id="color-result">감지된 색상: 없음</div>
+
+    <script>
+        const videoElement = document.getElementById("camera");
+        const canvasElement = document.getElementById("outputCanvas");
+        const canvasCtx = canvasElement.getContext("2d");
+
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "environment" }
+                });
+                videoElement.srcObject = stream;
+                videoElement.play();
+                console.log("카메라 활성화 완료");
+            } catch (err) {
+                console.error("카메라 접근 실패:", err);
+                alert("카메라 권한을 허용해주세요.");
+            }
+        }
+
+        function drawCameraFrame() {
+            if (videoElement.videoWidth === 0 || videoElement.videoHeight === 0) return;
+
+            canvasElement.width = videoElement.videoWidth;
+            canvasElement.height = videoElement.videoHeight;
+            canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+
+            requestAnimationFrame(drawCameraFrame);
+        }
+
+        function setupMediaPipeCamera() {
+            if (typeof Camera === "undefined") {
+                console.error("MediaPipe Camera 모듈이 로드되지 않음");
+                return;
+            }
+
+            const camera = new Camera(videoElement, {
+                onFrame: async () => {
+                    canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+                },
+                width: 640,
+                height: 480
+            });
+
+            camera.start();
+        }
+
+        window.onload = function () {
+            console.log("카메라 자동 활성화 시도...");
+            startCamera();
+            setupMediaPipeCamera();
+
+            document.body.ontouchstart = function () {
+                console.log("사용자 터치 감지, 카메라 재실행");
+                startCamera();
+            };
+
+            setTimeout(() => {
+                console.log("카메라 재시도...");
+                startCamera();
+            }, 3000);
+        };
+    </script>
+</body>
+</html>
+
