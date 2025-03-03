@@ -1,74 +1,183 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <title>ESP32 Servo Test</title>
+  <meta charset="UTF-8">
+  <title>OpenCV.js Color Detection & WebSocket</title>
+  <!-- OpenCV.js CDN (버전에 따라 링크 수정 가능) -->
+  <!-- HTTPS에서 카메라 사용하려면 아래 스크립트도 https:// 로 불러와야 합니다 -->
+  <script async src="https://docs.opencv.org/4.x/opencv.js" type="text/javascript"></script>
+  <style>
+    /* 간단한 스타일 */
+    #video, #canvas {
+      width: 320px;
+      height: 240px;
+      border: 1px solid #333;
+      background: #000;
+    }
+  </style>
 </head>
 <body>
-  <h1>ESP32 Servo Control via WebSocket</h1>
-  
-  <!-- IP/Port 입력 폼 -->
+  <h1>OpenCV.js Color Detection + WebSocket Test</h1>
+
+  <!-- 1) WebSocket 주소 입력 -->
   <div>
-    <label>ESP32 IP Address:</label>
-    <input type="text" id="esp32-ip" placeholder="192.168.0.xxx" />
-    <label>Port:</label>
-    <input type="text" id="esp32-port" placeholder="3801" />
-    <button onclick="connectWebSocket()">Connect</button>
-  </div>
-  
-  <p id="status">WebSocket not connected</p>
-  
-  <!-- 실제 색상 감지 대신 테스트용 버튼들 -->
-  <div>
-    <button onclick="sendColor('r')">Send RED (r)</button>
-    <button onclick="sendColor('g')">Send GREEN (g)</button>
-    <button onclick="sendColor('b')">Send BLUE (b)</button>
-    <button onclick="sendColor('w')">Send WHITE (w)</button>
-    <button onclick="sendColor('etc')">Send ETC (Not r/g/b/w)</button>
+    <label>WebSocket 주소 (예: ws://172.30.1.100:3800/ws):</label>
+    <input type="text" id="wsUrl" size="40" placeholder="ws://172.30.1.100:3800/ws" />
+    <button onclick="connectWS()">Connect</button>
+    <p id="wsStatus">WS Not connected</p>
   </div>
 
-  <!-- (참고) 실제 OpenCV.js 카메라 접근 코드는 별도로 구현해야 함 -->
-  <!--
-    예시 pseudo-code:
-    function detectColorFromCamera() {
-      // OpenCV.js 로 frame 받아서, HSV 변환 등으로 색상 판단
-      let colorResult = ...; // 'r', 'g', 'b', 'w' 중 하나 or 기타
-      ws.send(colorResult);
-    }
-    setInterval(detectColorFromCamera, 100); // 0.1초 주기 검사
-  -->
+  <!-- 2) 카메라 영상 표시 -->
+  <div>
+    <button onclick="startCamera()">카메라 시작</button>
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas" width="320" height="240" style="display:none"></canvas>
+    <p>감지된 색상: <span id="detectedColor">-</span></p>
+  </div>
+
+  <!-- 3) 수동 전송 버튼 (테스트용) -->
+  <div>
+    <button onclick="sendColor('r')">Send 'r'</button>
+    <button onclick="sendColor('g')">Send 'g'</button>
+    <button onclick="sendColor('b')">Send 'b'</button>
+    <button onclick="sendColor('w')">Send 'w'</button>
+  </div>
 
   <script>
     let ws = null;
+    let video = null;
+    let canvas = null;
+    let ctx = null;
 
-    function connectWebSocket() {
-      const ip = document.getElementById('esp32-ip').value;
-      const port = document.getElementById('esp32-port').value;
-      const wsUrl = `ws://${ip}:${port}/`;
+    // --------------- 1) WebSocket 연결 ---------------
+    function connectWS() {
+      const url = document.getElementById("wsUrl").value;
+      ws = new WebSocket(url);
 
-      ws = new WebSocket(wsUrl);
       ws.onopen = () => {
-        document.getElementById('status').innerText = "WebSocket connected";
+        document.getElementById("wsStatus").innerText = "WS Connected";
+        console.log("WebSocket connected:", url);
+      };
+      ws.onmessage = (evt) => {
+        console.log("Received from ESP32:", evt.data);
       };
       ws.onclose = () => {
-        document.getElementById('status').innerText = "WebSocket closed";
-      };
-      ws.onmessage = (event) => {
-        console.log("Received from ESP32:", event.data);
+        document.getElementById("wsStatus").innerText = "WS Closed";
+        console.log("WebSocket closed");
       };
       ws.onerror = (err) => {
-        document.getElementById('status').innerText = "WebSocket error";
+        document.getElementById("wsStatus").innerText = "WS Error";
         console.error(err);
       };
     }
 
-    function sendColor(colorChar) {
+    function sendColor(color) {
       if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(colorChar);
-        console.log("Sent color:", colorChar);
+        ws.send(color);
+        console.log("Sent:", color);
       } else {
-        alert("WebSocket not connected!");
+        alert("WebSocket not connected.");
       }
+    }
+
+    // --------------- 2) 카메라 초기화 ---------------
+    function startCamera() {
+      video = document.getElementById("video");
+      canvas = document.getElementById("canvas");
+      ctx = canvas.getContext('2d');
+
+      // MediaDevices.getUserMedia: HTTPS 환경 필요할 수 있음
+      navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+        .then(stream => {
+          video.srcObject = stream;
+          video.play();
+          console.log("Camera started");
+          // OpenCV.js 로딩이 끝났다면, setInterval로 프레임 검사 시작
+          // (opencv.js 파일이 async 로딩이므로 onload 시점 또는 setTimeout으로 지연 필요)
+          setTimeout(startProcessing, 1000); 
+        })
+        .catch(err => {
+          console.error("Camera error:", err);
+          alert("카메라 접근 실패: " + err);
+        });
+    }
+
+    // --------------- 3) OpenCV.js 로 컬러 감지 ---------------
+    function startProcessing() {
+      if (typeof cv === 'undefined') {
+        console.error("OpenCV.js not loaded yet!");
+        alert("OpenCV.js 로딩이 아직 안 된 것 같습니다. 잠시 후 다시 시도하세요.");
+        return;
+      }
+      console.log("OpenCV.js ready. Starting color detection loop...");
+
+      // 일정 주기로 카메라 프레임을 캡처해 HSV 변환 → 색상 범위 체크
+      setInterval(() => {
+        if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) {
+          return;
+        }
+        // 1) 캔버스에 현재 프레임 그리기
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // 2) OpenCV Mat 생성
+        let src = new cv.Mat(canvas.height, canvas.width, cv.CV_8UC4);
+        let dst = new cv.Mat(canvas.height, canvas.width, cv.CV_8UC4);
+        src.data.set(ctx.getImageData(0, 0, canvas.width, canvas.height).data);
+
+        // 3) BGR2HSV 변환
+        cv.cvtColor(src, dst, cv.COLOR_RGBA2RGB);
+        cv.cvtColor(dst, dst, cv.COLOR_RGB2HSV);
+
+        // 4) 각각의 색상 범위 마스크 생성 & 픽셀 개수 세기
+        let colorCounts = {
+          'r': getColorCount(dst, [0, 100, 100], [10, 255, 255]) + getColorCount(dst, [170, 100, 100], [180, 255, 255]),
+          'g': getColorCount(dst, [40, 100, 100], [80, 255, 255]),
+          'b': getColorCount(dst, [90, 100, 100], [130, 255, 255]),
+          'w': getColorCount(dst, [0, 0, 200], [180, 30, 255])  // 흰색: 명도 높고 채도 낮은 범위
+        };
+
+        // 5) 가장 큰 색상 찾기
+        let detected = 'none';
+        let maxVal = 0;
+        for (let c in colorCounts) {
+          if (colorCounts[c] > maxVal) {
+            maxVal = colorCounts[c];
+            detected = c;
+          }
+        }
+
+        // threshold(최소 픽셀 수) 기준으로 '검출된' 색상 판별
+        let threshold = 500; // 주변 밝기/해상도에 맞춰 조정
+        if (maxVal < threshold) {
+          detected = 'none';
+        }
+
+        // 6) 결과 표시 & WebSocket 전송
+        document.getElementById("detectedColor").innerText = (detected === 'none') ? '-' : detected;
+        if (detected !== 'none') {
+          sendColor(detected);  // r/g/b/w
+        } else {
+          // 감지 안 된 경우엔 아무것도 안 보냄 or 다른 처리
+        }
+
+        src.delete();
+        dst.delete();
+      }, 300); // 0.3초마다 반복
+    }
+
+    // HSV 범위 내 픽셀 개수 반환하는 함수
+    function getColorCount(hsvMat, lower, upper) {
+      // lower, upper: [H_min, S_min, V_min], [H_max, S_max, V_max]
+      let low = new cv.Mat(hsvMat.rows, hsvMat.cols, hsvMat.type(), lower);
+      let high = new cv.Mat(hsvMat.rows, hsvMat.cols, hsvMat.type(), upper);
+      let mask = new cv.Mat();
+      cv.inRange(hsvMat, low, high, mask);
+      // 픽셀 개수 계산
+      let count = cv.countNonZero(mask);
+      low.delete();
+      high.delete();
+      mask.delete();
+      return count;
     }
   </script>
 </body>
