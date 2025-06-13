@@ -197,7 +197,7 @@
 
     
     <script>
-        const SERVICE_UUID = '12345678-1234-1234-1234-123456789abc';
+        const SERVICE_UUID = '00c0ffee-1234-1234-1234-123456789abc';
         let characteristic;
 
         // BLE 페어링 함수
@@ -211,7 +211,7 @@
                 
                 const server = await device.gatt.connect();
                 const service = await server.getPrimaryService(SERVICE_UUID);
-                characteristic = await service.getCharacteristic('87654321-4321-4321-4321-cba987654321');
+                characteristic = await service.getCharacteristic('00c0ffee-4321-4321-4321-cba987654321');
                 
                 document.getElementById('status').innerText = "상태: 페어링 성공!";
                 console.log("BLE 기기 페어링 성공:", device.name);
