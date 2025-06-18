@@ -37,6 +37,7 @@
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
       max-width: 100%;
       height: auto;
+      aspect-ratio: 3/4;
     }
 
     #status-box {
@@ -58,7 +59,7 @@
       padding: 14px 18px;
       width: 100%;
       max-width: 400px;
-      height: 120px;
+      height: 90px;
       overflow-y: auto;
       border-radius: 12px;
       border: 1px solid #d1d1d6;
@@ -101,7 +102,7 @@
   <div id="status-box">
     <div id="status">상태: 연결되지 않음</div>
   </div>
-  <canvas id="outputCanvas" width="640" height="480"></canvas>
+  <canvas id="outputCanvas" width="480" height="640"></canvas>
   <pre id="log"></pre>
   <video id="camera" autoplay playsinline class="hidden"></video>
 
@@ -181,7 +182,7 @@
       canvasCtx.save();
       canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
       canvasCtx.translate(canvasElement.width, 0);
-      canvasCtx.scale(-1, 1); // 좌우 반전
+      canvasCtx.scale(-1, 1);
       canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
 
       if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
@@ -217,8 +218,8 @@
       onFrame: async () => {
         await hands.send({ image: videoElement });
       },
-      width: 640,
-      height: 480
+      width: 480,
+      height: 640
     });
 
     window.onload = async () => {
@@ -245,6 +246,6 @@
       <hr style="border: none; border-top: 1px solid #d1d1d6; margin: 10px 0;">
       2024 Teacher Jun, Dept. of Robotics Mechanical Design, Seoul Robotics Highschool
   </div>
-    
+
 </body>
 </html>
