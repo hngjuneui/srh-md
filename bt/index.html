@@ -187,113 +187,113 @@
             <input type="text" id="preset4" class="preset-input" placeholder="프리셋 4 입력">
         </div>
     </div>
-
     
     <!-- 페이지 하단 제작자 알림 -->
     <div style="width: 100%; max-width: 400px; text-align: center; padding: 10px 0; margin-top: 20px; font-size: 0.8em; color: #8e8e93;">
         <hr style="border: none; border-top: 1px solid #d1d1d6; margin: 10px 0;">
         2024 Teacher Jun, Dept. of Robotics Mechanical Design, Seoul Robotics Highschool
     </div>
-
     
     <script>
-        const SERVICE_UUID = '00c0ffee-1234-1234-1234-123456789abc';
-        let characteristic;
-
-        // BLE 페어링 함수
-        async function attemptPairing() {
-            document.getElementById('status').innerText = "상태: 페어링 대기 중...";
-
-            try {
-                const device = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: [SERVICE_UUID] }]
-                });
-                
-                const server = await device.gatt.connect();
-                const service = await server.getPrimaryService(SERVICE_UUID);
-                characteristic = await service.getCharacteristic('00c0ffee-4321-4321-4321-cba987654321');
-                
-                document.getElementById('status').innerText = "상태: 페어링 성공!";
-                console.log("BLE 기기 페어링 성공:", device.name);
-            } catch (error) {
-                document.getElementById('status').innerText = "상태: 페어링 대기 중...";
-                console.error("페어링 오류:", error);
-            }
-        }
-        
-        // 텍스트 폼 데이터 전송 함수
-        async function sendData() {
-            if (!characteristic) {
-                document.getElementById('status').innerText = "상태: 페어링 기기가 없습니다.";
+    let characteristic;
+    // 자동 BLE 연결 시도 (기기 선택 팝업)
+    async function scanAndConnect() {
+        document.getElementById('status').innerText = "상태: BLE 기기 선택 대기 중...";
+        try {
+            const device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: []  // 모든 서비스 접근을 허용
+            });
+            const server = await device.gatt.connect();
+            const services = await server.getPrimaryServices();
+    
+            if (services.length === 0) {
+                document.getElementById('status').innerText = "상태: 기기에서 GATT 서비스 없음";
                 return;
             }
-
-            const text = document.getElementById('inputText').value;
-            const encoder = new TextEncoder();
-            const data = encoder.encode(text);
-
-            try {
-                await characteristic.writeValue(data);
-                console.log("데이터 전송 완료:", text);
-            } catch (error) {
-                document.getElementById('status').innerText = "전송 상태: 전송이 실패하였습니다.";
-                console.error("데이터 전송 오류:", error);
+            const selectedService = services[0];  // 가장 첫 번째 서비스 사용
+            document.getElementById('status').innerText = `상태: ${device.name} 연결됨`;
+            console.log(`[${device.name}] 서비스 목록:`);
+            for (const service of services) {
+                console.log("▶ Service UUID:", service.uuid);
             }
-        }
-
-        // 프리셋 데이터 전송 함수
-        async function sendPresetData(presetNumber) {
-            if (!characteristic) {
-                document.getElementById('status').innerText = "페어링 상태: 페어링 기기가 없습니다.";
+            const characteristics = await selectedService.getCharacteristics();
+            if (characteristics.length === 0) {
+                document.getElementById('status').innerText = "상태: 선택된 서비스에 특성이 없습니다.";
                 return;
             }
-
-            const text = document.getElementById(`preset${presetNumber}`).value;
-            const encoder = new TextEncoder();
-            const data = encoder.encode(text);
-
-            try {
-                await characteristic.writeValue(data);
-                console.log(`프리셋 ${presetNumber} 데이터 전송 완료:`, text);
-            } catch (error) {
-                document.getElementById('status').innerText = "전송 상태: 전송이 실패하였습니다.";
-                console.error(`프리셋 ${presetNumber} 데이터 전송 오류:`, error);
-            }
+            characteristic = characteristics[0];  // 첫 번째 특성을 기본 사용
+            console.log("사용 중인 Characteristic UUID:", characteristic.uuid);
+        } catch (error) {
+            document.getElementById('status').innerText = "상태: 연결 실패 또는 취소됨";
+            console.error("BLE 연결 오류:", error);
         }
-
-        // 탭 전환 함수
-        function showTab(tabNumber) {
-            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-
-            document.getElementById(`tab${tabNumber}`).classList.add('active');
-            document.querySelectorAll('.tab-button')[tabNumber - 1].classList.add('active');
+    }
+    // 텍스트 전송
+    async function sendData() {
+        if (!characteristic) {
+            document.getElementById('status').innerText = "상태: 페어링 기기가 없습니다.";
+            return;
         }
-
-        // 페이지 로드 시 자동 페어링 시도
-        window.onload = () => {
-            if (navigator.bluetooth) {
-                attemptPairing();
-            } else {
-                document.getElementById('status').innerText = "이 기기는 블루투스를 지원하지 않습니다.";
-            }
-        };
-
-        // 터치 확대 및 텍스트 선택 방지 코드
-        document.addEventListener('touchstart', function preventZoom(event) {
-            if (event.touches.length > 1) {
-                event.preventDefault();
-            }
-        }, { passive: false });
-
-        let lastTouchEnd = 0;
-        document.addEventListener('touchend', function (event) {
-            const now = new Date().getTime();
-            if (now - lastTouchEnd <= 300) {
-                event.preventDefault();
-            }
-            lastTouchEnd = now;
-        }, false);
+        const text = document.getElementById('inputText').value;
+        const encoder = new TextEncoder();
+        const data = encoder.encode(text);
+        try {
+            await characteristic.writeValue(data);
+            console.log("데이터 전송 완료:", text);
+        } catch (error) {
+            document.getElementById('status').innerText = "전송 상태: 전송이 실패하였습니다.";
+            console.error("데이터 전송 오류:", error);
+        }
+    }
+    // 프리셋 데이터 전송
+    async function sendPresetData(presetNumber) {
+        if (!characteristic) {
+            document.getElementById('status').innerText = "페어링 상태: 페어링 기기가 없습니다.";
+            return;
+        }
+        const text = document.getElementById(`preset${presetNumber}`).value;
+        const encoder = new TextEncoder();
+        const data = encoder.encode(text);
+    
+        try {
+            await characteristic.writeValue(data);
+            console.log(`프리셋 ${presetNumber} 데이터 전송 완료:`, text);
+        } catch (error) {
+            document.getElementById('status').innerText = "전송 상태: 전송이 실패하였습니다.";
+            console.error(`프리셋 ${presetNumber} 데이터 전송 오류:`, error);
+        }
+    }
+    // 탭 전환
+    function showTab(tabNumber) {
+        document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+        document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+    
+        document.getElementById(`tab${tabNumber}`).classList.add('active');
+        document.querySelectorAll('.tab-button')[tabNumber - 1].classList.add('active');
+    }
+    // 페이지 로드 시 BLE 검색 자동 실행
+    window.onload = () => {
+        if (navigator.bluetooth) {
+            scanAndConnect();
+        } else {
+            document.getElementById('status').innerText = "이 기기는 블루투스를 지원하지 않습니다.";
+        }
+    };
+    // 터치 확대 및 텍스트 선택 방지
+    document.addEventListener('touchstart', function preventZoom(event) {
+        if (event.touches.length > 1) {
+            event.preventDefault();
+        }
+    }, { passive: false });
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', function (event) {
+        const now = new Date().getTime();
+        if (now - lastTouchEnd <= 300) {
+            event.preventDefault();
+        }
+        lastTouchEnd = now;
+    }, false);
     </script>
 </body>
 </html>
