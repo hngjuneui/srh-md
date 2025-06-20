@@ -110,6 +110,7 @@
   <script>
     let device;
     let writeCharacteristic;
+    let sentState = { left: false, right: false };
 
     const log = (msg) => {
       const el = document.getElementById('log');
@@ -147,7 +148,7 @@
     function sendMessage(label, msg) {
       if (!writeCharacteristic) return;
       const encoder = new TextEncoder();
-      writeCharacteristic.writeValue(encoder.encode(msg))
+      writeCharacteristic.writeValue(encoder.encode(msg + '\n'))
         .then(() => log(`[${label}] 전송: ${msg}`))
         .catch(err => log(`[${label}] 전송 실패: ${err}`));
     }
@@ -184,20 +185,34 @@
       canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
 
       if (results.poseLandmarks) {
-        drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 2 });
-        drawLandmarks(canvasCtx, results.poseLandmarks, { color: '#FF0000', lineWidth: 1 });
+        // 얼굴 관련 인덱스 제외
+        const excluded = new Set([...Array(10).keys()]);
+        const filtered = results.poseLandmarks.filter((_, idx) => !excluded.has(idx));
+
+        drawConnectors(canvasCtx, filtered, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 2 });
+        drawLandmarks(canvasCtx, filtered, { color: '#FF0000', lineWidth: 1 });
 
         const leftWrist = results.poseLandmarks[15];
         const rightWrist = results.poseLandmarks[16];
-        const centerY = canvasElement.height / 2;
+        const leftShoulder = results.poseLandmarks[11];
+        const rightShoulder = results.poseLandmarks[12];
 
-        if (leftWrist.y * canvasElement.height < centerY) {
+        const shoulderY = (leftShoulder.y + rightShoulder.y) / 2 * canvasElement.height;
+
+        if (!sentState.left && leftWrist.y * canvasElement.height < shoulderY) {
           sendMessage('LEFT', '4');
+          sentState.left = true;
           log('왼손 위로 올림 → 4 전송');
+        } else if (leftWrist.y * canvasElement.height > shoulderY) {
+          sentState.left = false;
         }
-        if (rightWrist.y * canvasElement.height < centerY) {
+
+        if (!sentState.right && rightWrist.y * canvasElement.height < shoulderY) {
           sendMessage('RIGHT', '6');
+          sentState.right = true;
           log('오른손 위로 올림 → 6 전송');
+        } else if (rightWrist.y * canvasElement.height > shoulderY) {
+          sentState.right = false;
         }
       }
 
