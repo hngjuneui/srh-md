@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>웹 AI 포즈 모델 조종기</title>
   <style>
     body {
@@ -112,11 +112,6 @@
     let writeCharacteristic;
     let sentState = { left: false, right: false };
 
-    // 추가: 전송 일시중지 및 근접 전송 인터벌 관련 변수
-    let pauseTransmission = false;
-    let proximityInterval = null;
-    let proximityDirection = null;
-
     const log = (msg) => {
       const el = document.getElementById('log');
       el.textContent += msg + '\n';
@@ -154,8 +149,8 @@
       if (!writeCharacteristic) return;
       const encoder = new TextEncoder();
       writeCharacteristic.writeValue(encoder.encode(msg + '\n'))
-        .then(() => log([${label}] 전송: ${msg}))
-        .catch(err => log([${label}] 전송 실패: ${err}));
+        .then(() => log(`[${label}] 전송: ${msg}`))
+        .catch(err => log(`[${label}] 전송 실패: ${err}`));
     }
 
     const videoElement = document.getElementById('camera');
@@ -166,15 +161,6 @@
       if (videoElement.videoWidth && videoElement.videoHeight) {
         canvasElement.width = videoElement.videoWidth;
         canvasElement.height = videoElement.videoHeight;
-      }
-    }
-
-    // 추가: 근접 전송 인터벌 해제 함수
-    function clearProximityInterval() {
-      if (proximityInterval) {
-        clearInterval(proximityInterval);
-        proximityInterval = null;
-        proximityDirection = null;
       }
     }
 
@@ -206,25 +192,15 @@
         const rightElbow = landmarks[14];
         const leftWrist = landmarks[15];
         const rightWrist = landmarks[16];
-
-        // 추가: 화면 밖 판정
-        const outOfBounds =
-          leftWrist.x < 0 || leftWrist.x > 1 || leftWrist.y < 0 || leftWrist.y > 1 ||
-          rightWrist.x < 0 || rightWrist.x > 1 || rightWrist.y < 0 || rightWrist.y > 1;
-
-        if (outOfBounds) {
-          if (!pauseTransmission) {
-            pauseTransmission = true;
-            clearProximityInterval();
-            log('⚠️ 주먹이 화면 밖으로 벗어남 → 전송 중지');
+        // 하나라도 화면 밖이면 전송 중단
+        if (isLeftWristOffscreen || isRightWristOffscreen) {
+          if (sentState.left || sentState.right) {
+            log('손이 화면 밖으로 나감 → 전송 중지');
           }
+          sentState = { left: false, right: false };
           canvasCtx.restore();
           return;
-        } else if (pauseTransmission) {
-          pauseTransmission = false;
-          log('✅ 주먹이 화면 안으로 복귀 → 전송 재개');
         }
-
         const drawLine = (a, b, color) => {
           canvasCtx.beginPath();
           canvasCtx.moveTo(a.x * canvasElement.width, a.y * canvasElement.height);
@@ -242,53 +218,20 @@
 
         const shoulderY = (leftShoulder.y + rightShoulder.y) / 2 * canvasElement.height;
 
-        if (!pauseTransmission) {
-          if (!sentState.left && leftWrist.y * canvasElement.height < shoulderY) {
-            sendMessage('LEFT', '4');
-            sentState.left = true;
-            log('왼손 위로 올림 → 4 전송');
-          } else if (leftWrist.y * canvasElement.height > shoulderY + 20) {
-            sentState.left = false;
-          }
-
-          if (!sentState.right && rightWrist.y * canvasElement.height < shoulderY) {
-            sendMessage('RIGHT', '6');
-            sentState.right = true;
-            log('오른손 위로 올림 → 6 전송');
-          } else if (rightWrist.y * canvasElement.height > shoulderY + 20) {
-            sentState.right = false;
-          }
+        if (!sentState.left && leftWrist.y * canvasElement.height < shoulderY) {
+          sendMessage('LEFT', '4');
+          sentState.left = true;
+          log('왼손 위로 올림 → 4 전송');
+        } else if (leftWrist.y * canvasElement.height > shoulderY + 20) {
+          sentState.left = false;
         }
 
-        // 추가: 주먹 근접(8/2) 전송 로직
-        if (!pauseTransmission) {
-          const x1 = leftWrist.x * canvasElement.width;
-          const y1 = leftWrist.y * canvasElement.height;
-          const x2 = rightWrist.x * canvasElement.width;
-          const y2 = rightWrist.y * canvasElement.height;
-          const dist = Math.hypot(x1 - x2, y1 - y2);
-          const closeThreshold = 60;  // 픽셀 단위 임계치
-
-          if (dist < closeThreshold) {
-            const avgY = (y1 + y2) / 2;
-            const region = (avgY > canvasElement.height / 2) ? 'bottom' : 'top';
-            const msg = region === 'bottom' ? '8' : '2';
-
-            if (!proximityInterval || proximityDirection !== region) {
-              clearProximityInterval();
-              proximityDirection = region;
-              sendMessage('PROX', msg);
-              proximityInterval = setInterval(() => {
-                if (!pauseTransmission) sendMessage('PROX', msg);
-              }, 500);
-              log(`✋ 주먹 근접 → ${msg} 전송(연속)`);
-            }
-          } else {
-            if (proximityInterval) {
-              clearProximityInterval();
-              log('🤝 주먹 분리 → 근접 전송 중단');
-            }
-          }
+        if (!sentState.right && rightWrist.y * canvasElement.height < shoulderY) {
+          sendMessage('RIGHT', '6');
+          sentState.right = true;
+          log('오른손 위로 올림 → 6 전송');
+        } else if (rightWrist.y * canvasElement.height > shoulderY + 20) {
+          sentState.right = false;
         }
       }
 
