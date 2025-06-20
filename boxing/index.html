@@ -126,11 +126,11 @@
       try {
         device = await navigator.bluetooth.requestDevice({
           acceptAllDevices: true,
-          optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e']
+          optionalServices: ['00c0ffee-1234-1234-1234-123456789abc']
         });
         const server = await device.gatt.connect();
-        const service = await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
-        writeCharacteristic = await service.getCharacteristic('6e400002-b5a3-f393-e0a9-e50e24dcca9e');
+        const service = await server.getPrimaryService('00c0ffee-1234-1234-1234-123456789abc');
+        writeCharacteristic = await service.getCharacteristic('00c0ffee-4321-4321-4321-cba987654321');
         log('BLE 연결 성공: ' + device.name);
         updateStatus('연결됨 (' + device.name + ')');
 
@@ -185,17 +185,28 @@
       canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
 
       if (results.poseLandmarks) {
-        // 얼굴 관련 인덱스 제외
-        const excluded = new Set([...Array(10).keys()]);
-        const filtered = results.poseLandmarks.filter((_, idx) => !excluded.has(idx));
+        const landmarks = results.poseLandmarks;
+        const leftShoulder = landmarks[11];
+        const rightShoulder = landmarks[12];
+        const leftElbow = landmarks[13];
+        const rightElbow = landmarks[14];
+        const leftWrist = landmarks[15];
+        const rightWrist = landmarks[16];
 
-        drawConnectors(canvasCtx, filtered, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 2 });
-        drawLandmarks(canvasCtx, filtered, { color: '#FF0000', lineWidth: 1 });
+        const drawLine = (a, b, color) => {
+          canvasCtx.beginPath();
+          canvasCtx.moveTo(a.x * canvasElement.width, a.y * canvasElement.height);
+          canvasCtx.lineTo(b.x * canvasElement.width, b.y * canvasElement.height);
+          canvasCtx.strokeStyle = color;
+          canvasCtx.lineWidth = 4;
+          canvasCtx.stroke();
+        };
 
-        const leftWrist = results.poseLandmarks[15];
-        const rightWrist = results.poseLandmarks[16];
-        const leftShoulder = results.poseLandmarks[11];
-        const rightShoulder = results.poseLandmarks[12];
+        drawLine(leftShoulder, rightShoulder, '#00FF00');
+        drawLine(leftShoulder, leftElbow, '#FF0000');
+        drawLine(leftElbow, leftWrist, '#FF0000');
+        drawLine(rightShoulder, rightElbow, '#0000FF');
+        drawLine(rightElbow, rightWrist, '#0000FF');
 
         const shoulderY = (leftShoulder.y + rightShoulder.y) / 2 * canvasElement.height;
 
@@ -203,7 +214,7 @@
           sendMessage('LEFT', '4');
           sentState.left = true;
           log('왼손 위로 올림 → 4 전송');
-        } else if (leftWrist.y * canvasElement.height > shoulderY) {
+        } else if (leftWrist.y * canvasElement.height > shoulderY + 20) {
           sentState.left = false;
         }
 
@@ -211,7 +222,7 @@
           sendMessage('RIGHT', '6');
           sentState.right = true;
           log('오른손 위로 올림 → 6 전송');
-        } else if (rightWrist.y * canvasElement.height > shoulderY) {
+        } else if (rightWrist.y * canvasElement.height > shoulderY + 20) {
           sentState.right = false;
         }
       }
