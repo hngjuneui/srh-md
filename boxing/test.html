@@ -186,6 +186,39 @@
   
     canvasCtx.restore();
   });
+  
+    async function startCamera() {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+      videoElement.srcObject = stream;
+      videoElement.play();
+      videoElement.onloadedmetadata = () => adjustCanvasSize();
+    }
+
+    const camera = new Camera(videoElement, {
+      onFrame: async () => {
+        await pose.send({ image: videoElement });
+      },
+      width: 480,
+      height: 640
+    });
+
+    window.onload = async () => {
+      await startCamera();
+      camera.start();
+
+      if (navigator.bluetooth) {
+        log('BLE를 연결하려면 화면을 클릭하세요.');
+        updateStatus('연결 대기 중');
+        document.body.addEventListener('click', async () => {
+          if (!writeCharacteristic) {
+            await connectBLE();
+          }
+        }, { once: true });
+      } else {
+        log('이 브라우저는 Web Bluetooth를 지원하지 않습니다.');
+        updateStatus('미지원');
+      }
+    };
   </script>
 
   <div style="width: 100%; max-width: 400px; text-align: center; padding: 10px 0; margin-top: 20px; font-size: 0.8em; color: #8e8e93;">
