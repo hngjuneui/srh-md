@@ -5,8 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>BLE 웹 시리얼 통신</title>
     <style>
-        /* 기존 스타일 유지 (생략) */
-        /* ... 생략 (위 제공 스타일 그대로) ... */
+        /* 전체 레이아웃 */
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             background-color: #f2f2f7;
@@ -22,6 +21,7 @@
             font-weight: 600;
             margin-bottom: 10px;
         }
+        /* 페어링 상태 */
         #status {
             margin: 10px 0;
             padding: 12px 20px;
@@ -35,8 +35,105 @@
             user-select: none;
             cursor: pointer;
         }
-        /* ... 이하 스타일 생략 ... */
-    </style>
+        /* 탭 버튼 스타일 */
+        .tab-buttons {
+            display: flex;
+            width: 100%;
+            max-width: 400px;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .tab-button {
+            flex: 1;
+            padding: 10px;
+            border-radius: 16px;
+            background-color: #e5e5ea;
+            color: #1c1c1e;
+            font-size: 1em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .tab-button.active {
+            background-color: #007aff;
+            color: #ffffff;
+        }
+        /* 탭 섹션 */
+        .tab {
+            display: none;
+            width: 100%;
+            max-width: 400px;
+        }
+        .tab.active {
+            display: block;
+        }
+        /* 입력 필드 */
+        input[type="text"] {
+            width: calc(100% - 20px);
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #d1d1d6;
+            border-radius: 12px;
+            font-size: 1em;
+            box-sizing: border-box;
+            background-color: #ffffff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+        }
+        /* 일반 버튼 */
+        button {
+            width: 100%;
+            max-width: 400px;
+            padding: 12px;
+            margin: 5px 0;
+            border: none;
+            border-radius: 12px;
+            background-color: #007aff;
+            color: white;
+            font-size: 1em;
+            font-weight: 500;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #005ecb;
+        }
+        /* 프리셋 버튼 스타일 */
+        .preset-buttons-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+        .preset-button-single {
+            width: 33%;
+            margin: 10px auto;
+            text-align: center;
+        }
+        .preset-button-row {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+        }
+        .preset-button-double {
+            width: 33%;
+            margin: 10px 5px;
+            text-align: center;
+        }
+        /* 프리셋 입력 필드 스타일 */
+        .preset-input {
+            width: calc(100% - 20px);
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #d1d1d6;
+            border-radius: 12px;
+            font-size: 1em;
+            box-sizing: border-box;
+            background-color: #ffffff;More actions
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+        }
+    </style>    
 </head>
 <body>
     <h1>BLE 웹 시리얼 통신</h1>
