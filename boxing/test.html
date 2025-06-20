@@ -123,10 +123,11 @@
     const canvasCtx = canvasElement.getContext("2d");
 
     function adjustCanvasSize() {
-      if (videoElement.videoWidth && videoElement.videoHeight) {
-        canvasElement.width = videoElement.videoWidth;
-        canvasElement.height = videoElement.videoHeight;
-        log(`Canvas 크기 조정됨: ${canvasElement.width}x${canvasElement.height}`);
+      if (canvasElement.width === 0 || canvasElement.height === 0) {
+        if (videoElement.videoWidth && videoElement.videoHeight) {
+          canvasElement.width = videoElement.videoWidth;
+          canvasElement.height = videoElement.videoHeight;
+        }
       }
     }
 
@@ -158,9 +159,10 @@
       canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
 
       if (results.poseLandmarks) {
-        const landmarks = results.poseLandmarks;
-        const [leftShoulder, rightShoulder, leftElbow, rightElbow, leftWrist, rightWrist] =
-          [landmarks[11], landmarks[12], landmarks[13], landmarks[14], landmarks[15], landmarks[16]];
+        const lm = results.poseLandmarks;
+        const leftShoulder = lm[11], rightShoulder = lm[12];
+        const leftElbow = lm[13], rightElbow = lm[14];
+        const leftWrist = lm[15], rightWrist = lm[16];
 
         if ([leftWrist, rightWrist].some(p => p.x < 0 || p.x > 1 || p.y < 0 || p.y > 1)) {
           sentState.left = false;
@@ -172,8 +174,30 @@
           return;
         }
 
-        drawConnectors(canvasCtx, landmarks, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 2 });
-        drawLandmarks(canvasCtx, landmarks, { color: '#FF0000', lineWidth: 1 });
+        const drawLine = (a, b, color) => {
+          canvasCtx.beginPath();
+          canvasCtx.moveTo(a.x * canvasElement.width, a.y * canvasElement.height);
+          canvasCtx.lineTo(b.x * canvasElement.width, b.y * canvasElement.height);
+          canvasCtx.strokeStyle = color;
+          canvasCtx.lineWidth = 2;
+          canvasCtx.stroke();
+        };
+
+        const drawPoint = (p, color) => {
+          canvasCtx.beginPath();
+          canvasCtx.arc(p.x * canvasElement.width, p.y * canvasElement.height, 5, 0, 2 * Math.PI);
+          canvasCtx.fillStyle = color;
+          canvasCtx.fill();
+        };
+
+        // Draw arms only
+        drawLine(leftShoulder, leftElbow, '#FF0000');
+        drawLine(leftElbow, leftWrist, '#FF0000');
+        drawLine(rightShoulder, rightElbow, '#0000FF');
+        drawLine(rightElbow, rightWrist, '#0000FF');
+        drawLine(leftShoulder, rightShoulder, '#00FF00');
+
+        [leftShoulder, rightShoulder, leftElbow, rightElbow, leftWrist, rightWrist].forEach(p => drawPoint(p, '#FF8800'));
 
         const shoulderY = (leftShoulder.y + rightShoulder.y) / 2 * canvasElement.height;
 
@@ -219,7 +243,6 @@
 
       videoElement.onloadedmetadata = () => {
         adjustCanvasSize();
-        log('✅ 비디오 metadata 로딩됨');
         camera.start();
       };
     }
