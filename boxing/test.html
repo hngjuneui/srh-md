@@ -79,7 +79,7 @@
 
     const log = msg => {
       const el = document.getElementById("log");
-      el.textContent += msg + "\\n";
+      el.textContent += msg + "\n";
       el.scrollTop = el.scrollHeight;
     };
 
@@ -113,7 +113,7 @@
     function sendMessage(label, msg) {
       if (!writeCharacteristic) return;
       const encoder = new TextEncoder();
-      writeCharacteristic.writeValue(encoder.encode(msg + "\\n"))
+      writeCharacteristic.writeValue(encoder.encode(msg + "\n"))
         .then(() => log(`[${label}] 전송: ${msg}`))
         .catch(err => log(`[${label}] 전송 실패: ${err}`));
     }
@@ -126,6 +126,7 @@
       if (videoElement.videoWidth && videoElement.videoHeight) {
         canvasElement.width = videoElement.videoWidth;
         canvasElement.height = videoElement.videoHeight;
+        log(`Canvas 크기 조정됨: ${canvasElement.width}x${canvasElement.height}`);
       }
     }
 
@@ -161,13 +162,12 @@
         const [leftShoulder, rightShoulder, leftElbow, rightElbow, leftWrist, rightWrist] =
           [landmarks[11], landmarks[12], landmarks[13], landmarks[14], landmarks[15], landmarks[16]];
 
-        // 주먹 화면 벗어남 확인
         if ([leftWrist, rightWrist].some(p => p.x < 0 || p.x > 1 || p.y < 0 || p.y > 1)) {
           sentState.left = false;
           sentState.right = false;
           lastX2Time = 0;
           lastX8Time = 0;
-          log(\"손이 화면 밖 → 전송 중단\");
+          log("손이 화면 밖 → 전송 중단");
           canvasCtx.restore();
           return;
         }
@@ -216,7 +216,12 @@
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
       videoElement.srcObject = stream;
       videoElement.play();
-      videoElement.onloadedmetadata = () => adjustCanvasSize();
+
+      videoElement.onloadedmetadata = () => {
+        adjustCanvasSize();
+        log('✅ 비디오 metadata 로딩됨');
+        camera.start();
+      };
     }
 
     const camera = new Camera(videoElement, {
@@ -227,7 +232,6 @@
 
     window.onload = async () => {
       await startCamera();
-      camera.start();
 
       if (navigator.bluetooth) {
         log('BLE를 연결하려면 화면을 클릭하세요.');
