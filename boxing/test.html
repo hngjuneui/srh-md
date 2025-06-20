@@ -73,7 +73,7 @@
   <script>
     let device;
     let writeCharacteristic;
-    let sentState = { left: false, right: false };
+    let sentState = { left: false, right: false, closeHands: false };
     let lastX8Time = 0;
     let lastX2Time = 0;
 
@@ -157,50 +157,28 @@
       canvasCtx.translate(canvasElement.width, 0);
       canvasCtx.scale(-1, 1);
       canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
-
+    
       if (results.poseLandmarks) {
-        const lm = results.poseLandmarks;
-        const leftShoulder = lm[11], rightShoulder = lm[12];
-        const leftElbow = lm[13], rightElbow = lm[14];
-        const leftWrist = lm[15], rightWrist = lm[16];
-
-        if ([leftWrist, rightWrist].some(p => p.x < 0 || p.x > 1 || p.y < 0 || p.y > 1)) {
-          sentState.left = false;
-          sentState.right = false;
-          lastX2Time = 0;
-          lastX8Time = 0;
-          log("손이 화면 밖 → 전송 중단");
-          canvasCtx.restore();
-          return;
+        const landmarks = results.poseLandmarks;
+        const leftShoulder = landmarks[11];
+        const rightShoulder = landmarks[12];
+        const leftWrist = landmarks[15];
+        const rightWrist = landmarks[16];
+    
+        // 화면 밖 판단
+        const isWristOutOfBounds = (wrist) => {
+          return wrist.x < 0 || wrist.x > 1 || wrist.y < 0 || wrist.y > 1;
+        };
+    
+        if (isWristOutOfBounds(leftWrist) || isWristOutOfBounds(rightWrist)) {
+          log('손이 화면 밖입니다. 전송 중지됨.');
+          return; // 모든 전송 중지
         }
-
-        const drawLine = (a, b, color) => {
-          canvasCtx.beginPath();
-          canvasCtx.moveTo(a.x * canvasElement.width, a.y * canvasElement.height);
-          canvasCtx.lineTo(b.x * canvasElement.width, b.y * canvasElement.height);
-          canvasCtx.strokeStyle = color;
-          canvasCtx.lineWidth = 2;
-          canvasCtx.stroke();
-        };
-
-        const drawPoint = (p, color) => {
-          canvasCtx.beginPath();
-          canvasCtx.arc(p.x * canvasElement.width, p.y * canvasElement.height, 5, 0, 2 * Math.PI);
-          canvasCtx.fillStyle = color;
-          canvasCtx.fill();
-        };
-
-        // Draw arms only
-        drawLine(leftShoulder, leftElbow, '#FF0000');
-        drawLine(leftElbow, leftWrist, '#FF0000');
-        drawLine(rightShoulder, rightElbow, '#0000FF');
-        drawLine(rightElbow, rightWrist, '#0000FF');
-        drawLine(leftShoulder, rightShoulder, '#00FF00');
-
-        [leftShoulder, rightShoulder, leftElbow, rightElbow, leftWrist, rightWrist].forEach(p => drawPoint(p, '#FF8800'));
-
+    
+        // 어깨 기준 y 계산
         const shoulderY = (leftShoulder.y + rightShoulder.y) / 2 * canvasElement.height;
-
+    
+        // 주먹 위로 올림 감지 (기존 기능 유지)
         if (!sentState.left && leftWrist.y * canvasElement.height < shoulderY) {
           sendMessage('LEFT', '4');
           sentState.left = true;
@@ -208,7 +186,7 @@
         } else if (leftWrist.y * canvasElement.height > shoulderY + 20) {
           sentState.left = false;
         }
-
+    
         if (!sentState.right && rightWrist.y * canvasElement.height < shoulderY) {
           sendMessage('RIGHT', '6');
           sentState.right = true;
@@ -216,23 +194,47 @@
         } else if (rightWrist.y * canvasElement.height > shoulderY + 20) {
           sentState.right = false;
         }
-
-        const isCrossed = areArmsCrossed(leftWrist, rightWrist);
-        const avgY = (leftWrist.y + rightWrist.y) / 2 * canvasElement.height;
-        const centerY = canvasElement.height / 2;
-        const now = Date.now();
-
-        if (isCrossed && avgY > centerY && now - lastX8Time > 500) {
-          sendMessage('하단 교차', '8');
-          lastX8Time = now;
-          log('하단 교차 → 8 전송');
-        } else if (isCrossed && avgY < centerY && now - lastX2Time > 500) {
-          sendMessage('상단 교차', '2');
-          lastX2Time = now;
-          log('상단 교차 → 2 전송');
+    
+        // 요청 2: 주먹 거리 가까움 → 2 또는 8 전송
+        const dx = leftWrist.x - rightWrist.x;
+        const dy = leftWrist.y - rightWrist.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const DISTANCE_THRESHOLD = 0.1; // 조정 가능
+    
+        if (!sentState.closeHands && distance < DISTANCE_THRESHOLD) {
+          const middleY = 0.5; // 화면의 중간 (비율 기준)
+          const avgY = (leftWrist.y + rightWrist.y) / 2;
+    
+          if (avgY > middleY) {
+            sendMessage('CLOSE', '8');
+            log('주먹 가까움 + 아래 → 8 전송');
+          } else {
+            sendMessage('CLOSE', '2');
+            log('주먹 가까움 + 위 → 2 전송');
+          }
+          sentState.closeHands = true;
+        } else if (distance >= DISTANCE_THRESHOLD + 0.03) {
+          // 손이 다시 멀어지면 상태 초기화
+          sentState.closeHands = false;
         }
+    
+        // 랜드마크 선 (기존 유지)
+        const drawLine = (a, b, color) => {
+          canvasCtx.beginPath();
+          canvasCtx.moveTo(a.x * canvasElement.width, a.y * canvasElement.height);
+          canvasCtx.lineTo(b.x * canvasElement.width, b.y * canvasElement.height);
+          canvasCtx.strokeStyle = color;
+          canvasCtx.lineWidth = 4;
+          canvasCtx.stroke();
+        };
+    
+        drawLine(leftShoulder, rightShoulder, '#00FF00');
+        drawLine(landmarks[11], landmarks[13], '#FF0000'); // 왼팔
+        drawLine(landmarks[13], landmarks[15], '#FF0000');
+        drawLine(landmarks[12], landmarks[14], '#0000FF'); // 오른팔
+        drawLine(landmarks[14], landmarks[16], '#0000FF');
       }
-
+    
       canvasCtx.restore();
     });
 
