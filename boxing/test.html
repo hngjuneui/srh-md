@@ -111,6 +111,7 @@
   let device;
   let writeCharacteristic;
   let sentState = { left: false, right: false };
+  const sendInterval = 500; // milliseconds
 
   const log = (msg) => {
     const el = document.getElementById('log');
@@ -237,17 +238,19 @@
   
       // X자 조건 판단
       const isCrossed = leftX > rightX;
-  
-      // 요청 1: 하단부 X자 → 8 지속 전송
+    
+      // 요청 1: 하단부 X자 → 8 지속 전송 (500ms 간격)
       const isXCrossBottom = isCrossed && leftY > midY + canvasH * 0.25 && rightY > midY + canvasH * 0.25;
-      if (isXCrossBottom) {
+      if (isXCrossBottom && now - lastSentTime.forward > sendInterval) {
         sendMessage('FORWARD', '8');
+        lastSentTime.forward = now;
       }
   
-      // 요청 2: 상단부 X자 → 2 지속 전송
+      // 요청 2: 상단부 X자 → 2 지속 전송 (500ms 간격)
       const isXCrossTop = isCrossed && leftY < midY - canvasH * 0.25 && rightY < midY - canvasH * 0.25;
-      if (isXCrossTop) {
+      if (isXCrossTop && now - lastSentTime.backward > sendInterval) {
         sendMessage('BACKWARD', '2');
+        lastSentTime.backward = now;
       }
     }
   
