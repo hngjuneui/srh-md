@@ -223,30 +223,36 @@
 
     
     <script>
-        const SERVICE_UUID = '12345678-1234-1234-1234-123456789abc';
+        let device;
         let characteristic;
-
-        // BLE 페어링 함수
-        async function attemptPairing() {
-            document.getElementById('status').innerText = "상태: 페어링 대기 중...";
-
+    
+        async function scanAndConnect() {
+            document.getElementById('status').innerText = "상태: BLE 기기 선택 대기 중...";
             try {
-                const device = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: [SERVICE_UUID] }]
+                // 사용자에게 팝업 제공 + 고정 UUID 명시
+                device = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true, // 이름 필터 없음 → 사용자 선택 자유도 ↑
+                    optionalServices: ['00c0ffee-1234-1234-1234-123456789abc']
                 });
-                
+    
                 const server = await device.gatt.connect();
-                const service = await server.getPrimaryService(SERVICE_UUID);
-                characteristic = await service.getCharacteristic('87654321-4321-4321-4321-cba987654321');
-                
-                document.getElementById('status').innerText = "상태: 페어링 성공!";
-                console.log("BLE 기기 페어링 성공:", device.name);
+    
+                const service = await server.getPrimaryService('00c0ffee-1234-1234-1234-123456789abc');
+                characteristic = await service.getCharacteristic('00c0ffee-4321-4321-4321-cba987654321');
+    
+                document.getElementById('status').innerText = `상태: ${device.name} 연결됨`;
+                console.log(`기기 "${device.name}"에 연결되었습니다.`);
+    
+                device.addEventListener('gattserverdisconnected', () => {
+                    document.getElementById('status').innerText = "상태: BLE 연결 끊김";
+                    characteristic = null;
+                });
+    
             } catch (error) {
-                document.getElementById('status').innerText = "상태: 페어링 대기 중...";
-                console.error("페어링 오류:", error);
+                document.getElementById('status').innerText = "상태: 연결 실패 또는 취소됨";
+                console.error("BLE 연결 오류:", error);
             }
         }
-        
         // 텍스트 폼 데이터 전송 함수
         async function sendData() {
             if (!characteristic) {
