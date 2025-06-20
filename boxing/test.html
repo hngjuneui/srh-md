@@ -107,7 +107,74 @@
   <pre id="log"></pre>
   <video id="camera" autoplay playsinline class="hidden"></video>
   
-  <script>
+<script>
+  let device;
+  let writeCharacteristic;
+  let sentState = { left: false, right: false };
+
+  const log = (msg) => {
+    const el = document.getElementById('log');
+    el.textContent += msg + '\n';
+    el.scrollTop = el.scrollHeight;
+  };
+
+  const updateStatus = (text) => {
+    document.getElementById('status').textContent = '상태: ' + text;
+  };
+
+  async function connectBLE() {
+    try {
+      device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: ['00c0ffee-1234-1234-1234-123456789abc']
+      });
+      const server = await device.gatt.connect();
+      const service = await server.getPrimaryService('00c0ffee-1234-1234-1234-123456789abc');
+      writeCharacteristic = await service.getCharacteristic('00c0ffee-4321-4321-4321-cba987654321');
+      log('BLE 연결 성공: ' + device.name);
+      updateStatus('연결됨 (' + device.name + ')');
+
+      device.addEventListener('gattserverdisconnected', () => {
+        log('BLE 연결 끊김.');
+        updateStatus('연결 끊김');
+        writeCharacteristic = null;
+      });
+    } catch (e) {
+      log('BLE 연결 실패: ' + e);
+      updateStatus('연결 실패');
+    }
+  }
+
+  function sendMessage(label, msg) {
+    if (!writeCharacteristic) return;
+    const encoder = new TextEncoder();
+    writeCharacteristic.writeValue(encoder.encode(msg + '\n'))
+      .then(() => log(`[${label}] 전송: ${msg}`))
+      .catch(err => log(`[${label}] 전송 실패: ${err}`));
+  }
+
+  const videoElement = document.getElementById('camera');
+  const canvasElement = document.getElementById('outputCanvas');
+  const canvasCtx = canvasElement.getContext('2d');
+
+  function adjustCanvasSize() {
+    if (videoElement.videoWidth && videoElement.videoHeight) {
+      canvasElement.width = videoElement.videoWidth;
+      canvasElement.height = videoElement.videoHeight;
+    }
+  }
+
+  const pose = new Pose({
+    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+  });
+
+  pose.setOptions({
+    modelComplexity: 1,
+    smoothLandmarks: true,
+    enableSegmentation: false,
+    minDetectionConfidence: 0.5,
+    minTrackingConfidence: 0.5
+  });
   pose.onResults(results => {
     adjustCanvasSize();
     canvasCtx.save();
