@@ -231,7 +231,7 @@
             try {
                 // 사용자에게 팝업 제공 + 고정 UUID 명시
                 device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true, // 이름 필터 없음 → 사용자 선택 자유도 ↑
+                    acceptAllDevices: true, // 이름 필터 없음
                     optionalServices: ['00c0ffee-1234-1234-1234-123456789abc']
                 });
     
