@@ -185,6 +185,7 @@
     canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
   
     if (results.poseLandmarks) {
+      const now = Date.now();
       const landmarks = results.poseLandmarks;
       const leftShoulder = landmarks[11];
       const rightShoulder = landmarks[12];
