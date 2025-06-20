@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>웹 AI 포즈 모델 조종기</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <titl웹 AI 포즈 모델 조종기</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -101,7 +101,7 @@
 <body>
   <h2>웹 AI 포즈 모델 조종기</h2>
   <div id="status-box">
-    <div id="status">화면을 터치하여 기기 검색...</div>
+    <div id="status">상태: 연결되지 않음</div>
   </div>
   <canvas id="outputCanvas"></canvas>
   <pre id="log"></pre>
@@ -114,7 +114,7 @@
 
     const log = (msg) => {
       const el = document.getElementById('log');
-      el.textContent += msg + '\\n';
+      el.textContent += msg + '\n';
       el.scrollTop = el.scrollHeight;
     };
 
@@ -148,7 +148,7 @@
     function sendMessage(label, msg) {
       if (!writeCharacteristic) return;
       const encoder = new TextEncoder();
-      writeCharacteristic.writeValue(encoder.encode(msg + '\\n'))
+      writeCharacteristic.writeValue(encoder.encode(msg + '\n'))
         .then(() => log(`[${label}] 전송: ${msg}`))
         .catch(err => log(`[${label}] 전송 실패: ${err}`));
     }
@@ -188,49 +188,42 @@
         const landmarks = results.poseLandmarks;
         const leftShoulder = landmarks[11];
         const rightShoulder = landmarks[12];
+        const leftElbow = landmarks[13];
+        const rightElbow = landmarks[14];
         const leftWrist = landmarks[15];
         const rightWrist = landmarks[16];
 
-        const canvasW = canvasElement.width;
-        const canvasH = canvasElement.height;
+        const drawLine = (a, b, color) => {
+          canvasCtx.beginPath();
+          canvasCtx.moveTo(a.x * canvasElement.width, a.y * canvasElement.height);
+          canvasCtx.lineTo(b.x * canvasElement.width, b.y * canvasElement.height);
+          canvasCtx.strokeStyle = color;
+          canvasCtx.lineWidth = 4;
+          canvasCtx.stroke();
+        };
 
-        const midY = (leftShoulder.y + rightShoulder.y) / 2 * canvasH;
+        drawLine(leftShoulder, rightShoulder, '#00FF00');
+        drawLine(leftShoulder, leftElbow, '#FF0000');
+        drawLine(leftElbow, leftWrist, '#FF0000');
+        drawLine(rightShoulder, rightElbow, '#0000FF');
+        drawLine(rightElbow, rightWrist, '#0000FF');
 
-        const leftY = leftWrist.y * canvasH;
-        const rightY = rightWrist.y * canvasH;
-        const leftX = leftWrist.x * canvasW;
-        const rightX = rightWrist.x * canvasW;
+        const shoulderY = (leftShoulder.y + rightShoulder.y) / 2 * canvasElement.height;
 
-        // 4, 6: 위로 손 들기
-        if (!sentState.left && leftY < midY) {
+        if (!sentState.left && leftWrist.y * canvasElement.height < shoulderY) {
           sendMessage('LEFT', '4');
           sentState.left = true;
           log('왼손 위로 올림 → 4 전송');
-        } else if (leftY > midY + 20) {
+        } else if (leftWrist.y * canvasElement.height > shoulderY + 20) {
           sentState.left = false;
         }
 
-        if (!sentState.right && rightY < midY) {
+        if (!sentState.right && rightWrist.y * canvasElement.height < shoulderY) {
           sendMessage('RIGHT', '6');
           sentState.right = true;
           log('오른손 위로 올림 → 6 전송');
-        } else if (rightY > midY + 20) {
+        } else if (rightWrist.y * canvasElement.height > shoulderY + 20) {
           sentState.right = false;
-        }
-
-        // X자 상태
-        const isCrossed = leftX > rightX;
-
-        // 하단 X자 → 전진
-        const isXCrossBottom = isCrossed && leftY > midY + canvasH * 0.25 && rightY > midY + canvasH * 0.25;
-        if (isXCrossBottom) {
-          sendMessage('FORWARD', '8');
-        }
-
-        // 상단 X자 → 후진
-        const isXCrossTop = isCrossed && leftY < midY - canvasH * 0.25 && rightY < midY - canvasH * 0.25;
-        if (isXCrossTop) {
-          sendMessage('BACKWARD', '2');
         }
       }
 
