@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>웹 AI 포즈 모델 조종기</title>
   <style>
     body {
@@ -14,6 +14,21 @@
       padding: 20px;
       color: #1c1c1e;
       margin: 0;
+    }
+
+    .main-container {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h2 {
+      font-size: 1.5em;
+      color: #007aff;
+      font-weight: 600;
+      margin-bottom: 10px;
     }
 
     canvas {
@@ -54,6 +69,26 @@
       white-space: pre-wrap;
     }
 
+    button {
+      width: 100%;
+      max-width: 400px;
+      padding: 12px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 12px;
+      background-color: #007aff;
+      color: white;
+      font-size: 1em;
+      font-weight: 500;
+      cursor: pointer;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #005ecb;
+    }
+
     video.hidden {
       display: none;
     }
@@ -65,7 +100,9 @@
 </head>
 <body>
   <h2>웹 AI 포즈 모델 조종기</h2>
-  <div id="status-box"><div id="status">화면을 터치하여 기기 검색...</div></div>
+  <div id="status-box">
+    <div id="status">화면을 터치하여 기기 검색...</div>
+  </div>
   <canvas id="outputCanvas"></canvas>
   <pre id="log"></pre>
   <video id="camera" autoplay playsinline class="hidden"></video>
@@ -73,73 +110,62 @@
   <script>
     let device;
     let writeCharacteristic;
-    let sentState = { left: false, right: false, closeHands: false };
-    let lastX8Time = 0;
-    let lastX2Time = 0;
+    let sentState = { left: false, right: false };
 
-    const log = msg => {
-      const el = document.getElementById("log");
-      el.textContent += msg + "\n";
+    const log = (msg) => {
+      const el = document.getElementById('log');
+      el.textContent += msg + '\n';
       el.scrollTop = el.scrollHeight;
     };
 
-    const updateStatus = text => {
-      document.getElementById("status").textContent = "상태: " + text;
+    const updateStatus = (text) => {
+      document.getElementById('status').textContent = '상태: ' + text;
     };
 
     async function connectBLE() {
       try {
         device = await navigator.bluetooth.requestDevice({
           acceptAllDevices: true,
-          optionalServices: ["00c0ffee-1234-1234-1234-123456789abc"]
+          optionalServices: ['00c0ffee-1234-1234-1234-123456789abc']
         });
         const server = await device.gatt.connect();
-        const service = await server.getPrimaryService("00c0ffee-1234-1234-1234-123456789abc");
-        writeCharacteristic = await service.getCharacteristic("00c0ffee-4321-4321-4321-cba987654321");
-        log("BLE 연결 성공: " + device.name);
-        updateStatus("연결됨 (" + device.name + ")");
+        const service = await server.getPrimaryService('00c0ffee-1234-1234-1234-123456789abc');
+        writeCharacteristic = await service.getCharacteristic('00c0ffee-4321-4321-4321-cba987654321');
+        log('BLE 연결 성공: ' + device.name);
+        updateStatus('연결됨 (' + device.name + ')');
 
-        device.addEventListener("gattserverdisconnected", () => {
-          log("BLE 연결 끊김.");
-          updateStatus("연결 끊김");
+        device.addEventListener('gattserverdisconnected', () => {
+          log('BLE 연결 끊김.');
+          updateStatus('연결 끊김');
           writeCharacteristic = null;
         });
       } catch (e) {
-        log("BLE 연결 실패: " + e);
-        updateStatus("연결 실패");
+        log('BLE 연결 실패: ' + e);
+        updateStatus('연결 실패');
       }
     }
 
     function sendMessage(label, msg) {
       if (!writeCharacteristic) return;
       const encoder = new TextEncoder();
-      writeCharacteristic.writeValue(encoder.encode(msg + "\n"))
+      writeCharacteristic.writeValue(encoder.encode(msg + '\n'))
         .then(() => log(`[${label}] 전송: ${msg}`))
         .catch(err => log(`[${label}] 전송 실패: ${err}`));
     }
 
-    const videoElement = document.getElementById("camera");
-    const canvasElement = document.getElementById("outputCanvas");
-    const canvasCtx = canvasElement.getContext("2d");
+    const videoElement = document.getElementById('camera');
+    const canvasElement = document.getElementById('outputCanvas');
+    const canvasCtx = canvasElement.getContext('2d');
 
     function adjustCanvasSize() {
-      if (canvasElement.width === 0 || canvasElement.height === 0) {
-        if (videoElement.videoWidth && videoElement.videoHeight) {
-          canvasElement.width = videoElement.videoWidth;
-          canvasElement.height = videoElement.videoHeight;
-        }
+      if (videoElement.videoWidth && videoElement.videoHeight) {
+        canvasElement.width = videoElement.videoWidth;
+        canvasElement.height = videoElement.videoHeight;
       }
     }
 
-    function areArmsCrossed(leftWrist, rightWrist) {
-      return (
-        Math.abs(leftWrist.x - rightWrist.x) < 0.1 &&
-        Math.abs(leftWrist.y - rightWrist.y) < 0.1
-      );
-    }
-
     const pose = new Pose({
-      locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
     });
 
     pose.setOptions({
@@ -157,68 +183,16 @@
       canvasCtx.translate(canvasElement.width, 0);
       canvasCtx.scale(-1, 1);
       canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
-    
+
       if (results.poseLandmarks) {
         const landmarks = results.poseLandmarks;
         const leftShoulder = landmarks[11];
         const rightShoulder = landmarks[12];
+        const leftElbow = landmarks[13];
+        const rightElbow = landmarks[14];
         const leftWrist = landmarks[15];
         const rightWrist = landmarks[16];
-    
-        // 화면 밖 판단
-        const isWristOutOfBounds = (wrist) => {
-          return wrist.x < 0 || wrist.x > 1 || wrist.y < 0 || wrist.y > 1;
-        };
-    
-        if (isWristOutOfBounds(leftWrist) || isWristOutOfBounds(rightWrist)) {
-          log('손이 화면 밖입니다. 전송 중지됨.');
-          return; // 모든 전송 중지
-        }
-    
-        // 어깨 기준 y 계산
-        const shoulderY = (leftShoulder.y + rightShoulder.y) / 2 * canvasElement.height;
-    
-        // 주먹 위로 올림 감지 (기존 기능 유지)
-        if (!sentState.left && leftWrist.y * canvasElement.height < shoulderY) {
-          sendMessage('LEFT', '4');
-          sentState.left = true;
-          log('왼손 위로 올림 → 4 전송');
-        } else if (leftWrist.y * canvasElement.height > shoulderY + 20) {
-          sentState.left = false;
-        }
-    
-        if (!sentState.right && rightWrist.y * canvasElement.height < shoulderY) {
-          sendMessage('RIGHT', '6');
-          sentState.right = true;
-          log('오른손 위로 올림 → 6 전송');
-        } else if (rightWrist.y * canvasElement.height > shoulderY + 20) {
-          sentState.right = false;
-        }
-    
-        // 요청 2: 주먹 거리 가까움 → 2 또는 8 전송
-        const dx = leftWrist.x - rightWrist.x;
-        const dy = leftWrist.y - rightWrist.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const DISTANCE_THRESHOLD = 0.1; // 조정 가능
-    
-        if (!sentState.closeHands && distance < DISTANCE_THRESHOLD) {
-          const middleY = 0.5; // 화면의 중간 (비율 기준)
-          const avgY = (leftWrist.y + rightWrist.y) / 2;
-    
-          if (avgY > middleY) {
-            sendMessage('CLOSE', '8');
-            log('주먹 가까움 + 아래 → 8 전송');
-          } else {
-            sendMessage('CLOSE', '2');
-            log('주먹 가까움 + 위 → 2 전송');
-          }
-          sentState.closeHands = true;
-        } else if (distance >= DISTANCE_THRESHOLD + 0.03) {
-          // 손이 다시 멀어지면 상태 초기화
-          sentState.closeHands = false;
-        }
-    
-        // 랜드마크 선 (기존 유지)
+
         const drawLine = (a, b, color) => {
           canvasCtx.beginPath();
           canvasCtx.moveTo(a.x * canvasElement.width, a.y * canvasElement.height);
@@ -227,14 +201,32 @@
           canvasCtx.lineWidth = 4;
           canvasCtx.stroke();
         };
-    
+
         drawLine(leftShoulder, rightShoulder, '#00FF00');
-        drawLine(landmarks[11], landmarks[13], '#FF0000'); // 왼팔
-        drawLine(landmarks[13], landmarks[15], '#FF0000');
-        drawLine(landmarks[12], landmarks[14], '#0000FF'); // 오른팔
-        drawLine(landmarks[14], landmarks[16], '#0000FF');
+        drawLine(leftShoulder, leftElbow, '#FF0000');
+        drawLine(leftElbow, leftWrist, '#FF0000');
+        drawLine(rightShoulder, rightElbow, '#0000FF');
+        drawLine(rightElbow, rightWrist, '#0000FF');
+
+        const shoulderY = (leftShoulder.y + rightShoulder.y) / 2 * canvasElement.height;
+
+        if (!sentState.left && leftWrist.y * canvasElement.height < shoulderY) {
+          sendMessage('LEFT', '4');
+          sentState.left = true;
+          log('왼손 위로 올림 → 4 전송');
+        } else if (leftWrist.y * canvasElement.height > shoulderY + 20) {
+          sentState.left = false;
+        }
+
+        if (!sentState.right && rightWrist.y * canvasElement.height < shoulderY) {
+          sendMessage('RIGHT', '6');
+          sentState.right = true;
+          log('오른손 위로 올림 → 6 전송');
+        } else if (rightWrist.y * canvasElement.height > shoulderY + 20) {
+          sentState.right = false;
+        }
       }
-    
+
       canvasCtx.restore();
     });
 
@@ -242,27 +234,28 @@
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
       videoElement.srcObject = stream;
       videoElement.play();
-
-      videoElement.onloadedmetadata = () => {
-        adjustCanvasSize();
-        camera.start();
-      };
+      videoElement.onloadedmetadata = () => adjustCanvasSize();
     }
 
     const camera = new Camera(videoElement, {
-      onFrame: async () => await pose.send({ image: videoElement }),
+      onFrame: async () => {
+        await pose.send({ image: videoElement });
+      },
       width: 480,
       height: 640
     });
 
     window.onload = async () => {
       await startCamera();
+      camera.start();
 
       if (navigator.bluetooth) {
         log('BLE를 연결하려면 화면을 클릭하세요.');
         updateStatus('연결 대기 중');
         document.body.addEventListener('click', async () => {
-          if (!writeCharacteristic) await connectBLE();
+          if (!writeCharacteristic) {
+            await connectBLE();
+          }
         }, { once: true });
       } else {
         log('이 브라우저는 Web Bluetooth를 지원하지 않습니다.');
