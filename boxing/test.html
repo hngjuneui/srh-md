@@ -106,77 +106,8 @@
   <canvas id="outputCanvas"></canvas>
   <pre id="log"></pre>
   <video id="camera" autoplay playsinline class="hidden"></video>
-
-
+  
   <script>
-    let device;
-    let writeCharacteristic;
-    let sentState = { left: false, right: false };
-
-    const log = (msg) => {
-      const el = document.getElementById('log');
-      el.textContent += msg + '\n';
-      el.scrollTop = el.scrollHeight;
-    };
-
-    const updateStatus = (text) => {
-      document.getElementById('status').textContent = '상태: ' + text;
-    };
-
-    async function connectBLE() {
-      try {
-        device = await navigator.bluetooth.requestDevice({
-          acceptAllDevices: true,
-          optionalServices: ['00c0ffee-1234-1234-1234-123456789abc']
-        });
-        const server = await device.gatt.connect();
-        const service = await server.getPrimaryService('00c0ffee-1234-1234-1234-123456789abc');
-        writeCharacteristic = await service.getCharacteristic('00c0ffee-4321-4321-4321-cba987654321');
-        log('BLE 연결 성공: ' + device.name);
-        updateStatus('연결됨 (' + device.name + ')');
-
-        device.addEventListener('gattserverdisconnected', () => {
-          log('BLE 연결 끊김.');
-          updateStatus('연결 끊김');
-          writeCharacteristic = null;
-        });
-      } catch (e) {
-        log('BLE 연결 실패: ' + e);
-        updateStatus('연결 실패');
-      }
-    }
-
-    function sendMessage(label, msg) {
-      if (!writeCharacteristic) return;
-      const encoder = new TextEncoder();
-      writeCharacteristic.writeValue(encoder.encode(msg + '\n'))
-        .then(() => log(`[${label}] 전송: ${msg}`))
-        .catch(err => log(`[${label}] 전송 실패: ${err}`));
-    }
-
-    const videoElement = document.getElementById('camera');
-    const canvasElement = document.getElementById('outputCanvas');
-    const canvasCtx = canvasElement.getContext('2d');
-
-    function adjustCanvasSize() {
-      if (videoElement.videoWidth && videoElement.videoHeight) {
-        canvasElement.width = videoElement.videoWidth;
-        canvasElement.height = videoElement.videoHeight;
-      }
-    }
-
-    const pose = new Pose({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
-    });
-
-    pose.setOptions({
-      modelComplexity: 1,
-      smoothLandmarks: true,
-      enableSegmentation: false,
-      minDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.5
-    });
-
   pose.onResults(results => {
     adjustCanvasSize();
     canvasCtx.save();
@@ -189,6 +120,8 @@
       const landmarks = results.poseLandmarks;
       const leftShoulder = landmarks[11];
       const rightShoulder = landmarks[12];
+      const leftElbow = landmarks[13];
+      const rightElbow = landmarks[14];
       const leftWrist = landmarks[15];
       const rightWrist = landmarks[16];
   
@@ -219,54 +152,42 @@
         sentState.right = false;
       }
   
+      // 선과 점 시각화
+      const drawLine = (a, b, color) => {
+        canvasCtx.beginPath();
+        canvasCtx.moveTo(a.x * canvasW, a.y * canvasH);
+        canvasCtx.lineTo(b.x * canvasW, b.y * canvasH);
+        canvasCtx.strokeStyle = color;
+        canvasCtx.lineWidth = 4;
+        canvasCtx.stroke();
+      };
+  
+      drawLine(leftShoulder, rightShoulder, '#00FF00');
+      drawLine(leftShoulder, leftElbow, '#FF0000');
+      drawLine(leftElbow, leftWrist, '#FF0000');
+      drawLine(rightShoulder, rightElbow, '#0000FF');
+      drawLine(rightElbow, rightWrist, '#0000FF');
+  
+      // X자 조건 판단
+      const isCrossed = leftX > rightX;
+  
       // 요청 1: 하단부 X자 → 8 지속 전송
-      const isXCrossBottom = leftX > rightX && leftY > midY + canvasH * 0.25 && rightY > midY + canvasH * 0.25;
+      const isXCrossBottom = isCrossed && leftY > midY + canvasH * 0.25 && rightY > midY + canvasH * 0.25;
       if (isXCrossBottom) {
         sendMessage('FORWARD', '8');
       }
   
       // 요청 2: 상단부 X자 → 2 지속 전송
-      const isXCrossTop = leftX > rightX && leftY < midY - canvasH * 0.25 && rightY < midY - canvasH * 0.25;
+      const isXCrossTop = isCrossed && leftY < midY - canvasH * 0.25 && rightY < midY - canvasH * 0.25;
       if (isXCrossTop) {
         sendMessage('BACKWARD', '2');
       }
     }
   
     canvasCtx.restore();
-    });
-    async function startCamera() {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
-      videoElement.srcObject = stream;
-      videoElement.play();
-      videoElement.onloadedmetadata = () => adjustCanvasSize();
-    }
-  
-    const camera = new Camera(videoElement, {
-      onFrame: async () => {
-        await pose.send({ image: videoElement });
-      },
-      width: 480,
-      height: 640
-    });
-  
-    window.onload = async () => {
-      await startCamera();
-      camera.start();
-  
-      if (navigator.bluetooth) {
-        log('BLE를 연결하려면 화면을 클릭하세요.');
-        updateStatus('연결 대기 중');
-        document.body.addEventListener('click', async () => {
-          if (!writeCharacteristic) {
-            await connectBLE();
-          }
-        }, { once: true });
-      } else {
-        log('이 브라우저는 Web Bluetooth를 지원하지 않습니다.');
-        updateStatus('미지원');
-      }
-    };
+  });
   </script>
+  
 
   <div style="width: 100%; max-width: 400px; text-align: center; padding: 10px 0; margin-top: 20px; font-size: 0.8em; color: #8e8e93;">
     <hr style="border: none; border-top: 1px solid #d1d1d6; margin: 10px 0;">
