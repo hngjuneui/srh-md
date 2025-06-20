@@ -107,29 +107,16 @@
   <pre id="log"></pre>
   <video id="camera" autoplay playsinline class="hidden"></video>
 
-  <div style="width: 100%; max-width: 400px; text-align: center; padding: 10px 0; margin-top: 20px; font-size: 0.8em; color: #8e8e93;">
-    <hr style="border: none; border-top: 1px solid #d1d1d6; margin: 10px 0;">
-    2025 Teacher Jun, Dept. of Robotics Mechanical Design, Seoul Robotics Highschool
-  </div>
-
   <script>
     let device;
     let writeCharacteristic;
     let sentState = { left: false, right: false };
-    const sendInterval = 500;
-
-    const lastSentTime = {
-      forward: 0,
-      backward: 0
-    };
+    let lastX8Time = 0;
+    let lastX2Time = 0;
 
     const log = (msg) => {
       const el = document.getElementById('log');
       el.textContent += msg + '\n';
-      // 선택: 200자 넘을 경우 로그 자르기
-      if (el.textContent.length > 2000) {
-        el.textContent = el.textContent.slice(-2000);
-      }
       el.scrollTop = el.scrollHeight;
     };
 
@@ -179,7 +166,7 @@
       }
     }
 
-    const pose = new pose.Pose({
+    const pose = new Pose({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
     });
 
@@ -191,6 +178,12 @@
       minTrackingConfidence: 0.5
     });
 
+    function areArmsCrossed(leftWrist, rightWrist) {
+      const xClose = Math.abs(leftWrist.x - rightWrist.x) < 0.1;
+      const yClose = Math.abs(leftWrist.y - rightWrist.y) < 0.1;
+      return xClose && yClose;
+    }
+
     pose.onResults(results => {
       adjustCanvasSize();
       canvasCtx.save();
@@ -200,7 +193,6 @@
       canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
 
       if (results.poseLandmarks) {
-        const now = Date.now();
         const landmarks = results.poseLandmarks;
         const leftShoulder = landmarks[11];
         const rightShoulder = landmarks[12];
@@ -209,59 +201,37 @@
         const leftWrist = landmarks[15];
         const rightWrist = landmarks[16];
 
-        const canvasW = canvasElement.width;
-        const canvasH = canvasElement.height;
+        const shoulderY = (leftShoulder.y + rightShoulder.y) / 2 * canvasElement.height;
 
-        const midY = (leftShoulder.y + rightShoulder.y) / 2 * canvasH;
-
-        const leftY = leftWrist.y * canvasH;
-        const rightY = rightWrist.y * canvasH;
-        const leftX = leftWrist.x * canvasW;
-        const rightX = rightWrist.x * canvasW;
-
-        if (!sentState.left && leftY < midY) {
+        if (!sentState.left && leftWrist.y * canvasElement.height < shoulderY) {
           sendMessage('LEFT', '4');
           sentState.left = true;
-          log('왼손 위로 올림 → 4 전송');
-        } else if (leftY > midY + 20) {
+          log('왼손 펀치 → 4 전송');
+        } else if (leftWrist.y * canvasElement.height > shoulderY + 20) {
           sentState.left = false;
         }
 
-        if (!sentState.right && rightY < midY) {
+        if (!sentState.right && rightWrist.y * canvasElement.height < shoulderY) {
           sendMessage('RIGHT', '6');
           sentState.right = true;
-          log('오른손 위로 올림 → 6 전송');
-        } else if (rightY > midY + 20) {
+          log('오른손 펀치 → 6 전송');
+        } else if (rightWrist.y * canvasElement.height > shoulderY + 20) {
           sentState.right = false;
         }
 
-        const drawLine = (a, b, color) => {
-          canvasCtx.beginPath();
-          canvasCtx.moveTo(a.x * canvasW, a.y * canvasH);
-          canvasCtx.lineTo(b.x * canvasW, b.y * canvasH);
-          canvasCtx.strokeStyle = color;
-          canvasCtx.lineWidth = 4;
-          canvasCtx.stroke();
-        };
+        const isCrossed = areArmsCrossed(leftWrist, rightWrist);
+        const avgY = (leftWrist.y + rightWrist.y) / 2 * canvasElement.height;
+        const centerY = canvasElement.height / 2;
+        const now = Date.now();
 
-        drawLine(leftShoulder, rightShoulder, '#00FF00');
-        drawLine(leftShoulder, leftElbow, '#FF0000');
-        drawLine(leftElbow, leftWrist, '#FF0000');
-        drawLine(rightShoulder, rightElbow, '#0000FF');
-        drawLine(rightElbow, rightWrist, '#0000FF');
-
-        const isCrossed = leftX > rightX;
-
-        const isXCrossBottom = isCrossed && leftY > midY + canvasH * 0.25 && rightY > midY + canvasH * 0.1;
-        if (isXCrossBottom && now - lastSentTime.forward > sendInterval) {
-          sendMessage('FORWARD', '8');
-          lastSentTime.forward = now;
-        }
-
-        const isXCrossTop = isCrossed && leftY < midY - canvasH * 0.25 && rightY < midY - canvasH * 0.1;
-        if (isXCrossTop && now - lastSentTime.backward > sendInterval) {
-          sendMessage('BACKWARD', '2');
-          lastSentTime.backward = now;
+        if (isCrossed && avgY > centerY && now - lastX8Time > 500) {
+          sendMessage('하단 교차', '8');
+          lastX8Time = now;
+          log('하단 교차 → 8 전송');
+        } else if (isCrossed && avgY < centerY && now - lastX2Time > 500) {
+          sendMessage('상단 교차', '2');
+          lastX2Time = now;
+          log('상단 교차 → 2 전송');
         }
       }
 
@@ -301,5 +271,10 @@
       }
     };
   </script>
+
+  <div style="width: 100%; max-width: 400px; text-align: center; padding: 10px 0; margin-top: 20px; font-size: 0.8em; color: #8e8e93;">
+    <hr style="border: none; border-top: 1px solid #d1d1d6; margin: 10px 0;">
+    2025 Teacher Jun, Dept. of Robotics Mechanical Design, Seoul Robotics Highschool
+  </div>
 </body>
 </html>
