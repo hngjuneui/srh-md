@@ -94,7 +94,7 @@
     }
   </style>
 
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
 </head>
@@ -110,8 +110,6 @@
   <script>
     let device;
     let writeCharacteristic;
-    let lastSentAngles = { right: null, left: null };
-    let isSending = { right: false, left: false };
 
     const log = (msg) => {
       const el = document.getElementById('log');
@@ -146,22 +144,12 @@
       }
     }
 
-    function sendMessage(hand, msg) {
-      if (!writeCharacteristic || isSending[hand]) return;
-      isSending[hand] = true;
+    function sendMessage(label, msg) {
+      if (!writeCharacteristic) return;
       const encoder = new TextEncoder();
       writeCharacteristic.writeValue(encoder.encode(msg))
-        .then(() => {
-          log(`[${hand}] 전송: ${msg}`);
-        })
-        .catch(err => log(`[${hand}] 전송 실패: ${err}`))
-        .finally(() => {
-          isSending[hand] = false;
-        });
-    }
-
-    function mapRange(value, inMin, inMax, outMin, outMax) {
-      return (value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
+        .then(() => log(`[${label}] 전송: ${msg}`))
+        .catch(err => log(`[${label}] 전송 실패: ${err}`));
     }
 
     const videoElement = document.getElementById('camera');
@@ -175,18 +163,19 @@
       }
     }
 
-    const hands = new Hands({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    const pose = new Pose({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
     });
 
-    hands.setOptions({
-      maxNumHands: 2,
+    pose.setOptions({
       modelComplexity: 1,
+      smoothLandmarks: true,
+      enableSegmentation: false,
       minDetectionConfidence: 0.5,
       minTrackingConfidence: 0.5
     });
 
-    hands.onResults(results => {
+    pose.onResults(results => {
       adjustCanvasSize();
       canvasCtx.save();
       canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
@@ -194,27 +183,22 @@
       canvasCtx.scale(-1, 1);
       canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
 
-      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        results.multiHandLandmarks.forEach((landmarks, i) => {
-          const handedness = results.multiHandedness[i]?.label.toLowerCase();
-          const thumb = landmarks[4];
-          const index = landmarks[8];
-          const dx = index.x - thumb.x;
-          const dy = index.y - thumb.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
+      if (results.poseLandmarks) {
+        drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 2 });
+        drawLandmarks(canvasCtx, results.poseLandmarks, { color: '#FF0000', lineWidth: 1 });
 
-          const clamped = Math.max(0.3, Math.min(dist, 0.6));
-          const angle = Math.round(mapRange(clamped, 0.3, 0.6, 60, 120));
+        const leftWrist = results.poseLandmarks[15];
+        const rightWrist = results.poseLandmarks[16];
+        const centerY = canvasElement.height / 2;
 
-          if (Math.abs(angle - (lastSentAngles[handedness] ?? 0)) >= 5 || angle === 60 || angle === 120) {
-            const msg = `${handedness[0].toUpperCase()}:${angle}`;
-            sendMessage(handedness, msg);
-            lastSentAngles[handedness] = angle;
-          }
-
-          drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, { color: '#00FF00', lineWidth: 2 });
-          drawLandmarks(canvasCtx, landmarks, { color: '#FF0000', lineWidth: 1 });
-        });
+        if (leftWrist.y * canvasElement.height < centerY) {
+          sendMessage('LEFT', '4');
+          log('왼손 위로 올림 → 4 전송');
+        }
+        if (rightWrist.y * canvasElement.height < centerY) {
+          sendMessage('RIGHT', '6');
+          log('오른손 위로 올림 → 6 전송');
+        }
       }
 
       canvasCtx.restore();
@@ -229,7 +213,7 @@
 
     const camera = new Camera(videoElement, {
       onFrame: async () => {
-        await hands.send({ image: videoElement });
+        await pose.send({ image: videoElement });
       },
       width: 480,
       height: 640
@@ -256,7 +240,7 @@
 
   <div style="width: 100%; max-width: 400px; text-align: center; padding: 10px 0; margin-top: 20px; font-size: 0.8em; color: #8e8e93;">
     <hr style="border: none; border-top: 1px solid #d1d1d6; margin: 10px 0;">
-    2024 Teacher Jun, Dept. of Robotics Mechanical Design, Seoul Robotics Highschool
+    2025 Teacher Jun, Dept. of Robotics Mechanical Design, Seoul Robotics Highschool
   </div>
 </body>
 </html>
