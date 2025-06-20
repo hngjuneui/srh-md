@@ -1,60 +1,276 @@
-<script>
-// ... 기존 코드 상단 생략 ...
-pose.onResults(results => {
-  adjustCanvasSize();
-  canvasCtx.save();
-  canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-  canvasCtx.translate(canvasElement.width, 0);
-  canvasCtx.scale(-1, 1);
-  canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
-
-  if (results.poseLandmarks) {
-    const landmarks = results.poseLandmarks;
-    const leftShoulder = landmarks[11];
-    const rightShoulder = landmarks[12];
-    const leftWrist = landmarks[15];
-    const rightWrist = landmarks[16];
-
-    const canvasW = canvasElement.width;
-    const canvasH = canvasElement.height;
-
-    const midY = (leftShoulder.y + rightShoulder.y) / 2 * canvasH;
-
-    const leftY = leftWrist.y * canvasH;
-    const rightY = rightWrist.y * canvasH;
-    const leftX = leftWrist.x * canvasW;
-    const rightX = rightWrist.x * canvasW;
-
-    // 기존 4, 6 동작 유지
-    if (!sentState.left && leftY < midY) {
-      sendMessage('LEFT', '4');
-      sentState.left = true;
-      log('왼손 위로 올림 → 4 전송');
-    } else if (leftY > midY + 20) {
-      sentState.left = false;
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>웹 AI 포즈 모델 조종기</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #f2f2f7;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      color: #1c1c1e;
+      margin: 0;
     }
 
-    if (!sentState.right && rightY < midY) {
-      sendMessage('RIGHT', '6');
-      sentState.right = true;
-      log('오른손 위로 올림 → 6 전송');
-    } else if (rightY > midY + 20) {
-      sentState.right = false;
+    .main-container {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
-    // 요청 1: 하단부 X자 → 8 지속 전송
-    const isXCrossBottom = leftX > rightX && leftY > midY + canvasH * 0.25 && rightY > midY + canvasH * 0.25;
-    if (isXCrossBottom) {
-      sendMessage('FORWARD', '8');
+    h2 {
+      font-size: 1.5em;
+      color: #007aff;
+      font-weight: 600;
+      margin-bottom: 10px;
     }
 
-    // 요청 2: 상단부 X자 → 2 지속 전송
-    const isXCrossTop = leftX > rightX && leftY < midY - canvasH * 0.25 && rightY < midY - canvasH * 0.25;
-    if (isXCrossTop) {
-      sendMessage('BACKWARD', '2');
+    canvas {
+      border-radius: 16px;
+      margin-top: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      max-width: 100%;
+      width: 100%;
+      height: auto;
+      display: block;
     }
-  }
 
-  canvasCtx.restore();
-});
-</script>
+    #status-box {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 12px;
+      background-color: #ffffff;
+      border: 1px solid #ccc;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+      font-size: 0.9em;
+    }
+
+    pre#log {
+      margin-top: 15px;
+      background: #ffffff;
+      padding: 14px 18px;
+      width: 100%;
+      max-width: 400px;
+      height: 70px;
+      overflow-y: auto;
+      border-radius: 12px;
+      border: 1px solid #d1d1d6;
+      font-size: 0.9em;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+      white-space: pre-wrap;
+    }
+
+    button {
+      width: 100%;
+      max-width: 400px;
+      padding: 12px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 12px;
+      background-color: #007aff;
+      color: white;
+      font-size: 1em;
+      font-weight: 500;
+      cursor: pointer;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #005ecb;
+    }
+
+    video.hidden {
+      display: none;
+    }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
+</head>
+<body>
+  <h2>웹 AI 포즈 모델 조종기</h2>
+  <div id="status-box">
+    <div id="status">화면을 터치하여 기기 검색...</div>
+  </div>
+  <canvas id="outputCanvas"></canvas>
+  <pre id="log"></pre>
+  <video id="camera" autoplay playsinline class="hidden"></video>
+
+
+  <script>
+    let device;
+    let writeCharacteristic;
+    let sentState = { left: false, right: false };
+
+    const log = (msg) => {
+      const el = document.getElementById('log');
+      el.textContent += msg + '\n';
+      el.scrollTop = el.scrollHeight;
+    };
+
+    const updateStatus = (text) => {
+      document.getElementById('status').textContent = '상태: ' + text;
+    };
+
+    async function connectBLE() {
+      try {
+        device = await navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: ['00c0ffee-1234-1234-1234-123456789abc']
+        });
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService('00c0ffee-1234-1234-1234-123456789abc');
+        writeCharacteristic = await service.getCharacteristic('00c0ffee-4321-4321-4321-cba987654321');
+        log('BLE 연결 성공: ' + device.name);
+        updateStatus('연결됨 (' + device.name + ')');
+
+        device.addEventListener('gattserverdisconnected', () => {
+          log('BLE 연결 끊김.');
+          updateStatus('연결 끊김');
+          writeCharacteristic = null;
+        });
+      } catch (e) {
+        log('BLE 연결 실패: ' + e);
+        updateStatus('연결 실패');
+      }
+    }
+
+    function sendMessage(label, msg) {
+      if (!writeCharacteristic) return;
+      const encoder = new TextEncoder();
+      writeCharacteristic.writeValue(encoder.encode(msg + '\n'))
+        .then(() => log(`[${label}] 전송: ${msg}`))
+        .catch(err => log(`[${label}] 전송 실패: ${err}`));
+    }
+
+    const videoElement = document.getElementById('camera');
+    const canvasElement = document.getElementById('outputCanvas');
+    const canvasCtx = canvasElement.getContext('2d');
+
+    function adjustCanvasSize() {
+      if (videoElement.videoWidth && videoElement.videoHeight) {
+        canvasElement.width = videoElement.videoWidth;
+        canvasElement.height = videoElement.videoHeight;
+      }
+    }
+
+    const pose = new Pose({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+    });
+
+    pose.setOptions({
+      modelComplexity: 1,
+      smoothLandmarks: true,
+      enableSegmentation: false,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+
+  pose.onResults(results => {
+    adjustCanvasSize();
+    canvasCtx.save();
+    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+    canvasCtx.translate(canvasElement.width, 0);
+    canvasCtx.scale(-1, 1);
+    canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+  
+    if (results.poseLandmarks) {
+      const landmarks = results.poseLandmarks;
+      const leftShoulder = landmarks[11];
+      const rightShoulder = landmarks[12];
+      const leftWrist = landmarks[15];
+      const rightWrist = landmarks[16];
+  
+      const canvasW = canvasElement.width;
+      const canvasH = canvasElement.height;
+  
+      const midY = (leftShoulder.y + rightShoulder.y) / 2 * canvasH;
+  
+      const leftY = leftWrist.y * canvasH;
+      const rightY = rightWrist.y * canvasH;
+      const leftX = leftWrist.x * canvasW;
+      const rightX = rightWrist.x * canvasW;
+  
+      // 기존 4, 6 동작 유지
+      if (!sentState.left && leftY < midY) {
+        sendMessage('LEFT', '4');
+        sentState.left = true;
+        log('왼손 위로 올림 → 4 전송');
+      } else if (leftY > midY + 20) {
+        sentState.left = false;
+      }
+  
+      if (!sentState.right && rightY < midY) {
+        sendMessage('RIGHT', '6');
+        sentState.right = true;
+        log('오른손 위로 올림 → 6 전송');
+      } else if (rightY > midY + 20) {
+        sentState.right = false;
+      }
+  
+      // 요청 1: 하단부 X자 → 8 지속 전송
+      const isXCrossBottom = leftX > rightX && leftY > midY + canvasH * 0.25 && rightY > midY + canvasH * 0.25;
+      if (isXCrossBottom) {
+        sendMessage('FORWARD', '8');
+      }
+  
+      // 요청 2: 상단부 X자 → 2 지속 전송
+      const isXCrossTop = leftX > rightX && leftY < midY - canvasH * 0.25 && rightY < midY - canvasH * 0.25;
+      if (isXCrossTop) {
+        sendMessage('BACKWARD', '2');
+      }
+    }
+  
+    canvasCtx.restore();
+    });
+    async function startCamera() {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+      videoElement.srcObject = stream;
+      videoElement.play();
+      videoElement.onloadedmetadata = () => adjustCanvasSize();
+    }
+  
+    const camera = new Camera(videoElement, {
+      onFrame: async () => {
+        await pose.send({ image: videoElement });
+      },
+      width: 480,
+      height: 640
+    });
+  
+    window.onload = async () => {
+      await startCamera();
+      camera.start();
+  
+      if (navigator.bluetooth) {
+        log('BLE를 연결하려면 화면을 클릭하세요.');
+        updateStatus('연결 대기 중');
+        document.body.addEventListener('click', async () => {
+          if (!writeCharacteristic) {
+            await connectBLE();
+          }
+        }, { once: true });
+      } else {
+        log('이 브라우저는 Web Bluetooth를 지원하지 않습니다.');
+        updateStatus('미지원');
+      }
+    };
+  </script>
+
+  <div style="width: 100%; max-width: 400px; text-align: center; padding: 10px 0; margin-top: 20px; font-size: 0.8em; color: #8e8e93;">
+    <hr style="border: none; border-top: 1px solid #d1d1d6; margin: 10px 0;">
+    2025 Teacher Jun, Dept. of Robotics Mechanical Design, Seoul Robotics Highschool
+  </div>
+</body>
+</html>
