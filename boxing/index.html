@@ -22,6 +22,7 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+      position: relative;
     }
 
     h2 {
@@ -31,14 +32,60 @@
       margin-bottom: 10px;
     }
 
-    canvas {
+    .canvas-container {
+      position: relative;
+      width: 100%;
+      max-width: 400px;
       border-radius: 16px;
-      margin-top: 10px;
+      overflow: hidden;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    canvas {
       max-width: 100%;
       width: 100%;
       height: auto;
       display: block;
+    }
+
+    .virtual-button {
+      position: absolute;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 600;
+      color: white;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      transition: all 0.3s ease;
+      z-index: 10;
+      user-select: none;
+      backdrop-filter: blur(10px);
+    }
+
+    .virtual-button.forward {
+      bottom: 20px;
+      right: 20px;
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+
+    .virtual-button.backward {
+      bottom: 20px;
+      left: 20px;
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+
+    .virtual-button.active {
+      transform: scale(1.05);
+      background: rgba(255, 255, 255, 0.25);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
     }
 
     #status-box {
@@ -103,14 +150,22 @@
   <div id="status-box">
     <div id="status">화면을 터치하여 기기 검색...</div>
   </div>
-  <canvas id="outputCanvas"></canvas>
+  
+  <div class="main-container">
+    <div class="canvas-container">
+      <canvas id="outputCanvas"></canvas>
+      <div class="virtual-button forward" id="forwardBtn">전진</div>
+      <div class="virtual-button backward" id="backwardBtn">후진</div>
+    </div>
+  </div>
+  
   <pre id="log"></pre>
   <video id="camera" autoplay playsinline class="hidden"></video>
 
   <script>
     let device;
     let writeCharacteristic;
-    let sentState = { left: false, right: false };
+    let sentState = { left: false, right: false, forward: false, backward: false };
 
     const log = (msg) => {
       const el = document.getElementById('log');
@@ -156,12 +211,29 @@
     const videoElement = document.getElementById('camera');
     const canvasElement = document.getElementById('outputCanvas');
     const canvasCtx = canvasElement.getContext('2d');
+    const forwardBtn = document.getElementById('forwardBtn');
+    const backwardBtn = document.getElementById('backwardBtn');
 
     function adjustCanvasSize() {
       if (videoElement.videoWidth && videoElement.videoHeight) {
         canvasElement.width = videoElement.videoWidth;
         canvasElement.height = videoElement.videoHeight;
       }
+    }
+
+    // 버튼 영역 체크 함수
+    function isPointInButton(point, button) {
+      const rect = button.getBoundingClientRect();
+      const canvasRect = canvasElement.getBoundingClientRect();
+      
+      // 캔버스 좌표를 화면 좌표로 변환
+      const screenX = canvasRect.left + (point.x * canvasRect.width);
+      const screenY = canvasRect.top + (point.y * canvasRect.height);
+      
+      return screenX >= rect.left && 
+             screenX <= rect.right && 
+             screenY >= rect.top && 
+             screenY <= rect.bottom;
     }
 
     const pose = new Pose({
@@ -210,6 +282,7 @@
 
         const shoulderY = (leftShoulder.y + rightShoulder.y) / 2 * canvasElement.height;
 
+        // 기존 위로 올리는 동작 (4, 6 전송)
         if (!sentState.left && leftWrist.y * canvasElement.height < shoulderY) {
           sendMessage('LEFT', '4');
           sentState.left = true;
@@ -224,6 +297,37 @@
           log('오른손 위로 올림 → 6 전송');
         } else if (rightWrist.y * canvasElement.height > shoulderY + 20) {
           sentState.right = false;
+        }
+
+        // 새로운 가상 버튼 기능
+        // 미러링된 좌표를 실제 좌표로 변환
+        const actualLeftWrist = { x: 1 - leftWrist.x, y: leftWrist.y };
+        const actualRightWrist = { x: 1 - rightWrist.x, y: rightWrist.y };
+
+        // 오른손으로 전진 버튼 (8 전송)
+        if (isPointInButton(actualRightWrist, forwardBtn)) {
+          if (!sentState.forward) {
+            sendMessage('FORWARD', '8');
+            sentState.forward = true;
+            forwardBtn.classList.add('active');
+            log('오른손으로 전진 버튼 터치 → 8 전송');
+          }
+        } else {
+          sentState.forward = false;
+          forwardBtn.classList.remove('active');
+        }
+
+        // 왼손으로 후진 버튼 (2 전송)
+        if (isPointInButton(actualLeftWrist, backwardBtn)) {
+          if (!sentState.backward) {
+            sendMessage('BACKWARD', '2');
+            sentState.backward = true;
+            backwardBtn.classList.add('active');
+            log('왼손으로 후진 버튼 터치 → 2 전송');
+          }
+        } else {
+          sentState.backward = false;
+          backwardBtn.classList.remove('active');
         }
       }
 
