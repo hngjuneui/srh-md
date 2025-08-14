@@ -36,17 +36,19 @@
       position: relative;
       width: 100%;
       max-width: 400px;
+      height: 300px;
       border-radius: 16px;
       overflow: hidden;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
       cursor: pointer;
+      background-color: #000;
     }
 
     canvas {
-      max-width: 100%;
       width: 100%;
-      height: auto;
-      display: block;
+      height: 100%;
+      object-fit: cover;
+      display: none;
     }
 
     #camera-placeholder {
@@ -54,7 +56,7 @@
       top: 0;
       left: 0;
       width: 100%;
-      height: 300px;
+      height: 100%;
       background-color: #000;
       display: flex;
       align-items: center;
@@ -131,7 +133,7 @@
   
   <div class="main-container">
     <div class="canvas-container" onclick="startCamera()">
-      <canvas id="outputCanvas" style="display: none;"></canvas>
+      <canvas id="outputCanvas"></canvas>
       <div id="camera-placeholder">카메라를 시작하려면 터치하세요</div>
     </div>
   </div>
@@ -337,29 +339,30 @@
       if (cameraStarted) return;
       
       try {
-        document.getElementById('camera-placeholder').style.display = 'none';
-        canvasElement.style.display = 'block';
-        
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
         videoElement.srcObject = stream;
         videoElement.play();
-        videoElement.onloadedmetadata = () => adjustCanvasSize();
         
-        const camera = new Camera(videoElement, {
-          onFrame: async () => {
-            await hands.send({ image: videoElement });
-          },
-          width: 480,
-          height: 640
-        });
-        
-        camera.start();
-        cameraStarted = true;
-        log('카메라 시작됨');
+        videoElement.onloadedmetadata = () => {
+          adjustCanvasSize();
+          // 카메라가 준비되면 플레이스홀더 숨기고 캔버스 표시
+          document.getElementById('camera-placeholder').style.display = 'none';
+          canvasElement.style.display = 'block';
+          
+          const camera = new Camera(videoElement, {
+            onFrame: async () => {
+              await hands.send({ image: videoElement });
+            },
+            width: 480,
+            height: 640
+          });
+          
+          camera.start();
+          cameraStarted = true;
+          log('카메라 시작됨');
+        };
         
       } catch (error) {
-        document.getElementById('camera-placeholder').style.display = 'block';
-        canvasElement.style.display = 'none';
         log('카메라 시작 실패: ' + error);
       }
     }
