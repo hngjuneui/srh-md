@@ -146,6 +146,8 @@
     let writeCharacteristic;
     let lastGesture = null;
     let cameraStarted = false;
+    let baselineZ = null; // 기준 Z 좌표 (처음 인식된 위치)
+    let handDetected = false;
 
     const log = (msg) => {
       const el = document.getElementById('log');
@@ -207,20 +209,22 @@
       }
     }
 
-    // 손바닥 중앙점 계산 함수
-    function calculatePalmCenter(landmarks) {
+    // 손바닥 중앙점과 Z좌표 계산 함수
+    function calculatePalmCenterAndDepth(landmarks) {
       // 손바닥의 주요 랜드마크들 (0: 손목, 5: 검지 MCP, 9: 중지 MCP, 13: 약지 MCP, 17: 새끼 MCP)
       const palmIndices = [0, 5, 9, 13, 17];
-      let centerX = 0, centerY = 0;
+      let centerX = 0, centerY = 0, centerZ = 0;
       
       palmIndices.forEach(index => {
         centerX += landmarks[index].x;
         centerY += landmarks[index].y;
+        centerZ += landmarks[index].z;
       });
       
       return {
         x: centerX / palmIndices.length,
-        y: centerY / palmIndices.length
+        y: centerY / palmIndices.length,
+        z: centerZ / palmIndices.length
       };
     }
 
@@ -269,13 +273,23 @@
       if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
         const landmarks = results.multiHandLandmarks[0]; // 첫 번째 손만 사용
         
-        // 손바닥 중앙점 계산
-        const palmCenter = calculatePalmCenter(landmarks);
-        const centerX = Math.round(palmCenter.x * canvasElement.width);
-        const centerY = Math.round(palmCenter.y * canvasElement.height);
+        // 손바닥 중앙점과 깊이 계산
+        const palmData = calculatePalmCenterAndDepth(landmarks);
+        const centerX = Math.round(palmData.x * canvasElement.width);
+        const centerY = Math.round(palmData.y * canvasElement.height);
         
-        // 손바닥 중앙 좌표 실시간 전송
-        sendMessage(`${centerX},${centerY}`);
+        // 처음 손이 인식되면 기준 Z좌표 설정
+        if (baselineZ === null) {
+          baselineZ = palmData.z;
+          handDetected = true;
+          log(`기준 깊이 설정: ${baselineZ.toFixed(4)}`);
+        }
+        
+        // 기준점 대비 Z좌표 변화 계산 (1000배 확대하여 정수로 변환)
+        const relativeZ = Math.round((palmData.z - baselineZ) * 1000);
+        
+        // 손바닥 중앙 좌표와 Z좌표 실시간 전송
+        sendMessage(`${centerX},${centerY},${relativeZ}`);
         
         // 제스처 인식
         const currentGesture = detectGesture(landmarks);
@@ -283,7 +297,7 @@
         // 제스처 변화 감지 시 'a' 전송
         if (lastGesture !== null && lastGesture !== currentGesture) {
           sendMessage('a');
-          log(`제스처 변화: ${lastGesture} -> ${currentGesture}`);
+          log(`제스처 변화: ${lastGesture} -> ${currentGesture} (Z: ${relativeZ})`);
         }
         lastGesture = currentGesture;
         
@@ -308,6 +322,11 @@
         canvasCtx.arc(centerX, centerY, 8, 0, 2 * Math.PI);
         canvasCtx.fill();
         
+        // Z좌표 텍스트 표시
+        canvasCtx.fillStyle = '#ffffff';
+        canvasCtx.font = '16px Arial';
+        canvasCtx.fillText(`Z: ${relativeZ}`, centerX + 15, centerY - 15);
+        
         // 연결선 그리기
         const connections = [
           [0, 1], [1, 2], [2, 3], [3, 4], // 엄지
@@ -329,6 +348,12 @@
         });
         
       } else {
+        // 손이 감지되지 않으면 기준점과 상태 초기화
+        if (handDetected) {
+          baselineZ = null;
+          handDetected = false;
+          log('손 감지 중단 - 기준점 초기화');
+        }
         lastGesture = null;
       }
 
