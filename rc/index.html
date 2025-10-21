@@ -525,36 +525,43 @@
               }
               currentColor = COLORS.backward;
             } else {
-              // 각도 계산 (왼손에서 오른손으로의 각도)
-              const angle = getAngle(leftFist, rightFist);
+              // 각도 계산 (왼손에서 오른손으로의 절대 각도)
+              const angle = getAbsoluteAngle(leftFist, rightFist);
               
               // 디버깅: 현재 각도 출력
-              console.log(`현재 각도: ${angle.toFixed(1)}°, 속도: ${currentSpeed}, 교차: ${isCrossed}`);
+              console.log(`절대 각도: ${angle.toFixed(1)}°, 속도: ${currentSpeed}, 교차: ${isCrossed}`);
+              
+              // 절대 수평선 기준 각도 판단
+              // -ANGLE_DEADZONE ~ +ANGLE_DEADZONE: 전진
+              // +ANGLE_DEADZONE 초과: 오른쪽이 낮음 = 우회전
+              // -ANGLE_DEADZONE 미만: 왼쪽이 낮음 = 좌회전
               
               if (Math.abs(angle) <= ANGLE_DEADZONE) {
                 // 전진 (수평 근처)
                 if (lastCommand !== '전진') {
                   newCommand = '전진';
                   lastCommand = newCommand;
+                  log(`각도 ${angle.toFixed(1)}° (수평) → 전진`);
                   updateDisplay();
                 }
-                // 전진 명령은 매 프레임마다 전송 (방향 유지)
                 sendMessage('전진', '8');
                 currentColor = COLORS.forward;
               } else if (angle > ANGLE_DEADZONE) {
-                // 우회전
+                // 우회전 (오른쪽 손이 낮음)
                 if (lastCommand !== '우회전') {
                   newCommand = '우회전';
                   lastCommand = newCommand;
+                  log(`각도 ${angle.toFixed(1)}° (오른쪽↓) → 우회전`);
                   updateDisplay();
                 }
                 sendMessage('우회전', '6');
                 currentColor = COLORS.turnRight;
               } else if (angle < -ANGLE_DEADZONE) {
-                // 좌회전
+                // 좌회전 (왼쪽 손이 낮음)
                 if (lastCommand !== '좌회전') {
                   newCommand = '좌회전';
                   lastCommand = newCommand;
+                  log(`각도 ${angle.toFixed(1)}° (왼쪽↓) → 좌회전`);
                   updateDisplay();
                 }
                 sendMessage('좌회전', '4');
