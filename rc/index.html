@@ -307,6 +307,53 @@
       if (results.poseLandmarks) {
         const landmarks = results.poseLandmarks;
         
+        // 입 좌표는 코 끝과 상순 중간으로 조정 (항상 먼저 처리)
+        const noseTip = landmarks[1];
+        const upperLip = landmarks[13];
+        const mouth = {
+          x: (noseTip.x + upperLip.x) / 2,
+          y: (noseTip.y + upperLip.y) / 2 + 0.02,  // 약간 아래로
+          z: (noseTip.z + upperLip.z) / 2
+        };
+
+        // 입 상태 확인 및 표시 (주먹 인식과 독립적으로 처리)
+        const mouthNowOpen = isMouthOpen(landmarks);
+        let mouthColor = mouthNowOpen ? COLORS.mouthOpen : COLORS.mouthClosed;
+        
+        if (!mouthOpen && mouthNowOpen) {
+          sendMessage('서보ON', '9');
+          log('입 열림 → 서보 재구동');
+          servoState = 'ON';
+          updateDisplay();
+        } else if (mouthOpen && !mouthNowOpen) {
+          sendMessage('서보OFF', '7');
+          log('입 닫힘 → 서보 구동');
+          servoState = 'OFF';
+          updateDisplay();
+        }
+        
+        mouthOpen = mouthNowOpen;
+
+        // 입 점 그리기 (항상 표시)
+        const mx = mouth.x * canvasElement.width;
+        const my = mouth.y * canvasElement.height;
+        
+        canvasCtx.beginPath();
+        canvasCtx.arc(mx, my, 14, 0, 2 * Math.PI);
+        canvasCtx.fillStyle = mouthColor;
+        canvasCtx.fill();
+        
+        canvasCtx.beginPath();
+        canvasCtx.arc(mx - 2, my - 2, 5, 0, 2 * Math.PI);
+        canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        canvasCtx.fill();
+        
+        canvasCtx.beginPath();
+        canvasCtx.arc(mx, my, 14, 0, 2 * Math.PI);
+        canvasCtx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+        canvasCtx.lineWidth = 3;
+        canvasCtx.stroke();
+
         // 손목 좌표를 주먹 위치로 조정 (y값을 올려서 손등 쪽으로)
         const leftFist = {
           x: landmarks[15].x,
@@ -318,17 +365,8 @@
           y: landmarks[16].y - 0.05,  // 위로 올림
           z: landmarks[16].z
         };
-        
-        // 입 좌표는 코 끝과 상순 중간으로 조정
-        const noseTip = landmarks[1];
-        const upperLip = landmarks[13];
-        const mouth = {
-          x: (noseTip.x + upperLip.x) / 2,
-          y: (noseTip.y + upperLip.y) / 2 + 0.02,  // 약간 아래로
-          z: (noseTip.z + upperLip.z) / 2
-        };
 
-        // 화면 밖 체크
+        // 화면 밖 체크 (손만 체크, 입은 계속 작동)
         if (isOutOfBounds(leftFist) || isOutOfBounds(rightFist)) {
           if (currentSpeed !== 0 || lastCommand !== '정지') {
             currentSpeed = 0;
@@ -481,44 +519,6 @@
         canvasCtx.setLineDash([10, 5]);
         canvasCtx.stroke();
         canvasCtx.setLineDash([]);
-
-        // 입 상태 확인 및 표시
-        const mouthNowOpen = isMouthOpen(landmarks);
-        let mouthColor = mouthNowOpen ? COLORS.mouthOpen : COLORS.mouthClosed;
-        
-        if (!mouthOpen && mouthNowOpen) {
-          sendMessage('서보ON', '9');
-          log('입 열림 → 서보 재구동');
-          servoState = 'ON';
-          updateDisplay();
-        } else if (mouthOpen && !mouthNowOpen) {
-          sendMessage('서보OFF', '7');
-          log('입 닫힘 → 서보 구동');
-          servoState = 'OFF';
-          updateDisplay();
-        }
-        
-        mouthOpen = mouthNowOpen;
-
-        // 입 점 그리기
-        const mx = mouth.x * canvasElement.width;
-        const my = mouth.y * canvasElement.height;
-        
-        canvasCtx.beginPath();
-        canvasCtx.arc(mx, my, 14, 0, 2 * Math.PI);
-        canvasCtx.fillStyle = mouthColor;
-        canvasCtx.fill();
-        
-        canvasCtx.beginPath();
-        canvasCtx.arc(mx - 2, my - 2, 5, 0, 2 * Math.PI);
-        canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-        canvasCtx.fill();
-        
-        canvasCtx.beginPath();
-        canvasCtx.arc(mx, my, 14, 0, 2 * Math.PI);
-        canvasCtx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-        canvasCtx.lineWidth = 3;
-        canvasCtx.stroke();
       }
 
       canvasCtx.restore();
