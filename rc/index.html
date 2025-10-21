@@ -307,13 +307,11 @@
       if (results.poseLandmarks) {
         const landmarks = results.poseLandmarks;
         
-        // 입 좌표는 코 끝과 상순 중간으로 조정 (항상 먼저 처리)
-        const noseTip = landmarks[1];
-        const upperLip = landmarks[13];
+        // 입 좌표는 코(landmark 0)를 사용
         const mouth = {
-          x: (noseTip.x + upperLip.x) / 2,
-          y: (noseTip.y + upperLip.y) / 2 + 0.02,  // 약간 아래로
-          z: (noseTip.z + upperLip.z) / 2
+          x: landmarks[0].x,
+          y: landmarks[0].y + 0.03,  // 코에서 약간 아래로 (입 위치)
+          z: landmarks[0].z
         };
 
         // 입 상태 확인 및 표시 (주먹 인식과 독립적으로 처리)
@@ -386,7 +384,7 @@
         // 임계값 설정
         const STOP_THRESHOLD = 0.12;      // 정지 시작 거리
         const DEADZONE_THRESHOLD = 0.16;  // 데드존 (이 거리까지는 정지 유지)
-        const ANGLE_DEADZONE = 40;        // 각도 데드존 (±40도는 전진)
+        const ANGLE_DEADZONE = 50;        // 각도 데드존 (±50도는 전진)
         
         let currentColor = COLORS.stop;
         let newCommand = lastCommand;
@@ -444,6 +442,9 @@
             } else {
               // 각도 계산
               const angle = getAngle(leftFist, rightFist);
+              
+              // 디버깅용 로그 (필요시)
+              // console.log(`현재 각도: ${angle.toFixed(1)}°`);
               
               if (Math.abs(angle) <= ANGLE_DEADZONE) {
                 // 전진 (수평 근처)
