@@ -518,11 +518,11 @@
               // 후진
               if (newCommand !== '후진') {
                 newCommand = '후진';
-                sendMessage('후진', '2');
-                log('손 교차 → 후진');
                 lastCommand = newCommand;
+                log('손 교차 → 후진');
                 updateDisplay();
               }
+              sendMessage('후진', '2');
               currentColor = COLORS.backward;
             } else {
               // 각도 계산 (왼손에서 오른손으로의 절대 각도)
