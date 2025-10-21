@@ -303,9 +303,26 @@
       if (results.poseLandmarks) {
         const landmarks = results.poseLandmarks;
         
-        const leftFist = landmarks[15];
-        const rightFist = landmarks[16];
-        const mouth = landmarks[10];
+        // 손목 좌표를 주먹 위치로 조정 (y값을 올려서 손등 쪽으로)
+        const leftFist = {
+          x: landmarks[15].x,
+          y: landmarks[15].y - 0.05,  // 위로 올림
+          z: landmarks[15].z
+        };
+        const rightFist = {
+          x: landmarks[16].x,
+          y: landmarks[16].y - 0.05,  // 위로 올림
+          z: landmarks[16].z
+        };
+        
+        // 입 좌표는 코 끝과 상순 중간으로 조정
+        const noseTip = landmarks[1];
+        const upperLip = landmarks[13];
+        const mouth = {
+          x: (noseTip.x + upperLip.x) / 2,
+          y: (noseTip.y + upperLip.y) / 2 + 0.02,  // 약간 아래로
+          z: (noseTip.z + upperLip.z) / 2
+        };
 
         // 화면 밖 체크
         if (isOutOfBounds(leftFist) || isOutOfBounds(rightFist)) {
@@ -326,8 +343,8 @@
         
         // 임계값 설정
         const STOP_THRESHOLD = 0.12;      // 정지 시작 거리
-        const DEADZONE_THRESHOLD = 0.18;  // 데드존 (이 거리까지는 정지 유지)
-        const ANGLE_DEADZONE = 25;        // 각도 데드존 (±25도는 전진)
+        const DEADZONE_THRESHOLD = 0.16;  // 데드존 (이 거리까지는 정지 유지)
+        const ANGLE_DEADZONE = 40;        // 각도 데드존 (±40도는 전진)
         
         let currentColor = COLORS.stop;
         let newCommand = lastCommand;
@@ -349,14 +366,14 @@
           // 움직임 영역
           
           // 거리 변화에 따른 속도 조절
-          if (distance > lastDistance + 0.025) {
+          if (distance > lastDistance + 0.015) {
             if (currentSpeed < 10) {
               currentSpeed++;
               sendMessage('속도증가', '3');
               log(`속도 증가 → ${currentSpeed}단계`);
               updateDisplay();
             }
-          } else if (distance < lastDistance - 0.025) {
+          } else if (distance < lastDistance - 0.015) {
             if (currentSpeed > 0) {
               currentSpeed--;
               if (currentSpeed === 0) {
