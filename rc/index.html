@@ -270,10 +270,14 @@
     }
 
     function isMouthOpen(landmarks) {
-      const upperLip = landmarks[13];
-      const lowerLip = landmarks[14];
+      // 상순(upper lip): landmark 0
+      // 하순(lower lip): landmark 17
+      const upperLip = landmarks[0];
+      const lowerLip = landmarks[17];
       const distance = getDistance(upperLip, lowerLip);
-      return distance > 0.02;
+      
+      // 임계값을 더 크게 조정 (입을 확실히 벌려야 인식)
+      return distance > 0.025;
     }
 
     function isOutOfBounds(point) {
