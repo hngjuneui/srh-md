@@ -116,8 +116,8 @@
             justify-content: center;
             width: 100%;
         }
-        .preset-button-double {
-            width: 33%;
+        .preset-button-triple {
+            width: 28%;
             margin: 10px 5px;
             text-align: center;
         }
@@ -130,7 +130,7 @@
             border-radius: 12px;
             font-size: 1em;
             box-sizing: border-box;
-            background-color: #ffffff;More actions
+            background-color: #ffffff;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
         }
     </style>    
@@ -158,22 +158,25 @@
                 <button onclick="sendPresetData(1)">버튼1</button>
             </div>
             <div class="preset-button-row">
-                <div class="preset-button-double">
+                <div class="preset-button-triple">
                     <button onclick="sendPresetData(2)">버튼2</button>
                 </div>
-                <div class="preset-button-double">
+                <div class="preset-button-triple">
                     <button onclick="sendPresetData(3)">버튼3</button>
+                </div>
+                <div class="preset-button-triple">
+                    <button onclick="sendPresetData(4)">버튼4</button>
                 </div>
             </div>
             <div class="preset-button-single">
-                <button onclick="sendPresetData(4)">버튼4</button>
+                <button onclick="sendPresetData(5)">버튼5</button>
             </div>
-            </div>
-            <input type="text" id="preset1" class="preset-input" placeholder="프리셋 1 입력" />
-            <input type="text" id="preset2" class="preset-input" placeholder="프리셋 2 입력" />
-            <input type="text" id="preset3" class="preset-input" placeholder="프리셋 3 입력" />
-            <input type="text" id="preset4" class="preset-input" placeholder="프리셋 4 입력" />
         </div>
+        <input type="text" id="preset1" class="preset-input" placeholder="프리셋 1 입력" value="8" />
+        <input type="text" id="preset2" class="preset-input" placeholder="프리셋 2 입력" value="4" />
+        <input type="text" id="preset3" class="preset-input" placeholder="프리셋 3 입력" value="5" />
+        <input type="text" id="preset4" class="preset-input" placeholder="프리셋 4 입력" value="6" />
+        <input type="text" id="preset5" class="preset-input" placeholder="프리셋 5 입력" value="2" />
     </div>
 
     <div style="width: 100%; max-width: 400px; text-align: center; padding: 10px 0; margin-top: 20px; font-size: 0.8em; color: #8e8e93;">
