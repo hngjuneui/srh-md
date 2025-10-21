@@ -233,19 +233,29 @@
       if (!writeCharacteristic) return;
       
       const now = Date.now();
-      const key = label + msg;
       
-      // 중복 명령 방지 (같은 명령이 100ms 이내에 재전송되지 않도록)
-      if (key === lastSentCommand && now - lastSentTime < COMMAND_THROTTLE) {
-        return;
+      // 방향 명령(4,6,8)과 속도 명령(1,3)은 중복 방지 제외
+      // 속도가 0보다 크면 방향 명령은 계속 전송 (아두이노가 방향 유지 위해 필요)
+      if (msg === '4' || msg === '6' || msg === '8' || msg === '2') {
+        // 방향 명령은 항상 전송 (중복 방지 안 함)
+      } else {
+        // 다른 명령은 중복 방지
+        const key = label + msg;
+        if (key === lastSentCommand && now - lastSentTime < COMMAND_THROTTLE) {
+          return;
+        }
+        lastSentCommand = key;
+        lastSentTime = now;
       }
-      
-      lastSentCommand = key;
-      lastSentTime = now;
       
       const encoder = new TextEncoder();
       writeCharacteristic.writeValue(encoder.encode(msg + '\n'))
-        .then(() => log(`${label} → ${msg}`))
+        .then(() => {
+          // 로그는 방향 변경 시에만 (너무 많은 로그 방지)
+          if (msg === '1' || msg === '3' || msg === '5' || msg === '7' || msg === '9') {
+            log(`${label} → ${msg}`);
+          }
+        })
         .catch(err => log(`전송 실패: ${err}`));
     }
 
@@ -362,16 +372,17 @@
       if (results.poseLandmarks) {
         const landmarks = results.poseLandmarks;
         
-        // 눈 좌표 (Pose 모델에서 대략적 위치만 가져옴)
+        // 눈 좌표 (Pose 모델에서 대략적 위치, 미러링 고려)
+        // 캔버스가 좌우 반전되어 있으므로 왼쪽과 오른쪽을 바꿔서 표시
         const leftEye = {
-          x: landmarks[2].x,
-          y: landmarks[2].y,
-          z: landmarks[2].z
-        };
-        const rightEye = {
-          x: landmarks[5].x,
+          x: landmarks[5].x,  // 실제 오른쪽 눈 좌표를 왼쪽에 표시
           y: landmarks[5].y,
           z: landmarks[5].z
+        };
+        const rightEye = {
+          x: landmarks[2].x,  // 실제 왼쪽 눈 좌표를 오른쪽에 표시
+          y: landmarks[2].y,
+          z: landmarks[2].z
         };
 
         // 눈 깜빡임 상태 확인 (Face Mesh 사용)
@@ -399,7 +410,7 @@
           rightEyeClosed = false;
         }
 
-        // 눈 점 그리기 (항상 표시)
+        // 눈 점 그리기 (미러링된 화면에 맞춰 표시)
         const drawEye = (eye, isClosed, label) => {
           const x = eye.x * canvasElement.width;
           const y = eye.y * canvasElement.height;
@@ -422,6 +433,7 @@
           canvasCtx.stroke();
         };
 
+        // 미러링된 화면이므로 표시 위치는 반대지만 기능은 정상
         drawEye(leftEye, eyeStatus.leftClosed, '왼눈');
         drawEye(rightEye, eyeStatus.rightClosed, '오른눈');
 
@@ -513,41 +525,39 @@
               }
               currentColor = COLORS.backward;
             } else {
-              // 각도 계산
+              // 각도 계산 (왼손에서 오른손으로의 각도)
               const angle = getAngle(leftFist, rightFist);
               
-              // 디버깅용 로그 (필요시)
-              // console.log(`현재 각도: ${angle.toFixed(1)}°`);
+              // 디버깅: 현재 각도 출력
+              console.log(`현재 각도: ${angle.toFixed(1)}°, 속도: ${currentSpeed}, 교차: ${isCrossed}`);
               
               if (Math.abs(angle) <= ANGLE_DEADZONE) {
                 // 전진 (수평 근처)
-                if (newCommand !== '전진') {
+                if (lastCommand !== '전진') {
                   newCommand = '전진';
-                  sendMessage('전진', '8');
-                  log(`각도 ${angle.toFixed(1)}° → 전진`);
                   lastCommand = newCommand;
                   updateDisplay();
                 }
+                // 전진 명령은 매 프레임마다 전송 (방향 유지)
+                sendMessage('전진', '8');
                 currentColor = COLORS.forward;
               } else if (angle > ANGLE_DEADZONE) {
                 // 우회전
-                if (newCommand !== '우회전') {
+                if (lastCommand !== '우회전') {
                   newCommand = '우회전';
-                  sendMessage('우회전', '6');
-                  log(`각도 ${angle.toFixed(1)}° → 우회전`);
                   lastCommand = newCommand;
                   updateDisplay();
                 }
+                sendMessage('우회전', '6');
                 currentColor = COLORS.turnRight;
               } else if (angle < -ANGLE_DEADZONE) {
                 // 좌회전
-                if (newCommand !== '좌회전') {
+                if (lastCommand !== '좌회전') {
                   newCommand = '좌회전';
-                  sendMessage('좌회전', '4');
-                  log(`각도 ${angle.toFixed(1)}° → 좌회전`);
                   lastCommand = newCommand;
                   updateDisplay();
                 }
+                sendMessage('좌회전', '4');
                 currentColor = COLORS.turnLeft;
               }
             }
