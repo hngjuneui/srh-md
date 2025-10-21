@@ -140,6 +140,7 @@
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/face_mesh.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
 </head>
@@ -171,6 +172,7 @@
     let lastDistance = 0;
     let leftEyeClosed = false;   // 왼쪽 눈 상태
     let rightEyeClosed = false;  // 오른쪽 눈 상태
+    let faceDetected = false;    // 얼굴 감지 상태
     
     // 명령 전송 제어 (중복 방지)
     let lastSentCommand = '';
@@ -270,29 +272,42 @@
       return Math.atan2(dy, dx) * 180 / Math.PI;
     }
 
-    // 눈 깜빡임 감지 함수
-    function isEyeClosed(eyeLandmark, earLandmark, noseLandmark) {
-      // 눈-귀 거리와 눈-코 거리 비율로 눈 감김 판단
-      const eyeToEar = getDistance(eyeLandmark, earLandmark);
-      const eyeToNose = getDistance(eyeLandmark, noseLandmark);
+    // 눈 깜빡임 감지 함수 (Face Mesh 사용)
+    // EAR (Eye Aspect Ratio) 알고리즘
+    function calculateEAR(eyePoints) {
+      // 수직 거리 2개
+      const vertical1 = getDistance(eyePoints[1], eyePoints[5]);
+      const vertical2 = getDistance(eyePoints[2], eyePoints[4]);
+      // 수평 거리 1개
+      const horizontal = getDistance(eyePoints[0], eyePoints[3]);
       
-      // 눈을 감으면 눈-귀 거리가 상대적으로 짧아짐
-      const ratio = eyeToEar / eyeToNose;
-      
-      // 임계값: 눈을 감으면 비율이 낮아짐
-      return ratio < 1.8;
+      // EAR 계산
+      const ear = (vertical1 + vertical2) / (2.0 * horizontal);
+      return ear;
     }
     
-    function checkEyeStatus(landmarks) {
-      const leftEye = landmarks[2];   // 왼쪽 눈
-      const rightEye = landmarks[5];  // 오른쪽 눈
-      const leftEar = landmarks[7];   // 왼쪽 귀
-      const rightEar = landmarks[8];  // 오른쪽 귀
-      const nose = landmarks[0];      // 코
+    function checkEyeStatus(faceLandmarks) {
+      if (!faceLandmarks || faceLandmarks.length === 0) {
+        return { leftClosed: false, rightClosed: false };
+      }
+      
+      // 왼쪽 눈 랜드마크 인덱스 (Face Mesh 기준)
+      const leftEyeIndices = [33, 160, 158, 133, 153, 144];
+      // 오른쪽 눈 랜드마크 인덱스 (Face Mesh 기준)
+      const rightEyeIndices = [362, 385, 387, 263, 373, 380];
+      
+      const leftEyePoints = leftEyeIndices.map(i => faceLandmarks[i]);
+      const rightEyePoints = rightEyeIndices.map(i => faceLandmarks[i]);
+      
+      const leftEAR = calculateEAR(leftEyePoints);
+      const rightEAR = calculateEAR(rightEyePoints);
+      
+      // EAR 임계값 (0.2 이하면 눈 감김)
+      const EAR_THRESHOLD = 0.2;
       
       return {
-        leftClosed: isEyeClosed(leftEye, leftEar, nose),
-        rightClosed: isEyeClosed(rightEye, rightEar, nose)
+        leftClosed: leftEAR < EAR_THRESHOLD,
+        rightClosed: rightEAR < EAR_THRESHOLD
       };
     }
 
@@ -312,6 +327,30 @@
       minTrackingConfidence: 0.5
     });
 
+    // Face Mesh 초기화
+    const faceMesh = new FaceMesh({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+    });
+
+    faceMesh.setOptions({
+      maxNumFaces: 1,
+      refineLandmarks: true,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+
+    // Face Mesh 결과 저장용
+    let latestFaceLandmarks = null;
+
+    faceMesh.onResults(results => {
+      if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+        latestFaceLandmarks = results.multiFaceLandmarks[0];
+        faceDetected = true;
+      } else {
+        faceDetected = false;
+      }
+    });
+
     pose.onResults(results => {
       adjustCanvasSize();
       canvasCtx.save();
@@ -323,7 +362,7 @@
       if (results.poseLandmarks) {
         const landmarks = results.poseLandmarks;
         
-        // 눈 좌표 (얼굴 표시용)
+        // 눈 좌표 (Pose 모델에서 대략적 위치만 가져옴)
         const leftEye = {
           x: landmarks[2].x,
           y: landmarks[2].y,
@@ -335,11 +374,11 @@
           z: landmarks[5].z
         };
 
-        // 눈 깜빡임 상태 확인 (주먹 인식과 독립적으로 처리)
-        const eyeStatus = checkEyeStatus(landmarks);
+        // 눈 깜빡임 상태 확인 (Face Mesh 사용)
+        const eyeStatus = checkEyeStatus(latestFaceLandmarks);
         
         // 왼쪽 눈 감김 → 서보 닫기 (숫자 7)
-        if (!leftEyeClosed && eyeStatus.leftClosed) {
+        if (!leftEyeClosed && eyeStatus.leftClosed && faceDetected) {
           sendMessage('서보OFF', '7');
           log('왼쪽 눈 감김 → 서보 구동');
           servoState = 'OFF';
@@ -350,7 +389,7 @@
         }
         
         // 오른쪽 눈 감김 → 서보 열기 (숫자 9)
-        if (!rightEyeClosed && eyeStatus.rightClosed) {
+        if (!rightEyeClosed && eyeStatus.rightClosed && faceDetected) {
           sendMessage('서보ON', '9');
           log('오른쪽 눈 감김 → 서보 재구동');
           servoState = 'ON';
@@ -569,6 +608,7 @@
     const camera = new Camera(videoElement, {
       onFrame: async () => {
         await pose.send({ image: videoElement });
+        await faceMesh.send({ image: videoElement });
       },
       width: 480,
       height: 640
