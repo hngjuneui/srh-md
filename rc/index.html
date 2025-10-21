@@ -169,7 +169,8 @@
     let lastCommand = '정지';
     let servoState = 'OFF';
     let lastDistance = 0;
-    let mouthOpen = false;  // 초기값: 입 닫힘
+    let leftEyeClosed = false;   // 왼쪽 눈 상태
+    let rightEyeClosed = false;  // 오른쪽 눈 상태
     
     // 명령 전송 제어 (중복 방지)
     let lastSentCommand = '';
@@ -183,8 +184,8 @@
       turnLeft: '#FFE66D',     // 소프트 옐로우
       turnRight: '#A8E6CF',    // 민트 그린
       stop: '#95A5A6',         // 그레이
-      mouthClosed: '#2C3E50',  // 다크 네이비
-      mouthOpen: '#E74C3C'     // 브릿지 레드
+      eyeOpen: '#3498DB',      // 블루 (눈 뜸)
+      eyeClosed: '#E74C3C'     // 레드 (눈 감김)
     };
 
     const log = (msg) => {
@@ -269,32 +270,30 @@
       return Math.atan2(dy, dx) * 180 / Math.PI;
     }
 
-    function isMouthOpen(landmarks) {
-      // MediaPipe Pose는 얼굴 세부 랜드마크가 제한적
-      // 눈과 코의 거리를 이용해 입 열림 추정
-      const nose = landmarks[0];      // 코
+    // 눈 깜빡임 감지 함수
+    function isEyeClosed(eyeLandmark, earLandmark, noseLandmark) {
+      // 눈-귀 거리와 눈-코 거리 비율로 눈 감김 판단
+      const eyeToEar = getDistance(eyeLandmark, earLandmark);
+      const eyeToNose = getDistance(eyeLandmark, noseLandmark);
+      
+      // 눈을 감으면 눈-귀 거리가 상대적으로 짧아짐
+      const ratio = eyeToEar / eyeToNose;
+      
+      // 임계값: 눈을 감으면 비율이 낮아짐
+      return ratio < 1.8;
+    }
+    
+    function checkEyeStatus(landmarks) {
       const leftEye = landmarks[2];   // 왼쪽 눈
       const rightEye = landmarks[5];  // 오른쪽 눈
+      const leftEar = landmarks[7];   // 왼쪽 귀
+      const rightEar = landmarks[8];  // 오른쪽 귀
+      const nose = landmarks[0];      // 코
       
-      // 눈-코 거리 (얼굴 크기 기준)
-      const eyeDistance = getDistance(leftEye, rightEye);
-      
-      // 코-왼쪽귀, 코-오른쪽귀 거리 비교로 입 열림 추정
-      const leftEar = landmarks[7];
-      const rightEar = landmarks[8];
-      
-      const leftDistance = getDistance(nose, leftEar);
-      const rightDistance = getDistance(nose, rightEar);
-      
-      // 얼굴이 정면을 향할 때 좌우 거리 차이가 작음
-      const asymmetry = Math.abs(leftDistance - rightDistance);
-      
-      // 비율을 사용한 더 정확한 판단
-      // 입을 벌리면 얼굴 전체 비율이 변함
-      const ratio = asymmetry / eyeDistance;
-      
-      // 임계값 조정 (더 명확한 구분)
-      return ratio > 0.15;
+      return {
+        leftClosed: isEyeClosed(leftEye, leftEar, nose),
+        rightClosed: isEyeClosed(rightEye, rightEar, nose)
+      };
     }
 
     function isOutOfBounds(point) {
@@ -324,53 +323,68 @@
       if (results.poseLandmarks) {
         const landmarks = results.poseLandmarks;
         
-        // 입 좌표는 코(landmark 0)를 사용
-        const mouth = {
-          x: landmarks[0].x,
-          y: landmarks[0].y + 0.03,  // 코에서 약간 아래로 (입 위치)
-          z: landmarks[0].z
+        // 눈 좌표 (얼굴 표시용)
+        const leftEye = {
+          x: landmarks[2].x,
+          y: landmarks[2].y,
+          z: landmarks[2].z
+        };
+        const rightEye = {
+          x: landmarks[5].x,
+          y: landmarks[5].y,
+          z: landmarks[5].z
         };
 
-        // 입 상태 확인 및 표시 (주먹 인식과 독립적으로 처리)
-        const mouthNowOpen = isMouthOpen(landmarks);
-        let mouthColor = mouthNowOpen ? COLORS.mouthOpen : COLORS.mouthClosed;
+        // 눈 깜빡임 상태 확인 (주먹 인식과 독립적으로 처리)
+        const eyeStatus = checkEyeStatus(landmarks);
         
-        // 상태 변화가 있을 때만 명령 전송
-        if (!mouthOpen && mouthNowOpen) {
-          // 닫힘 → 열림
-          sendMessage('서보ON', '9');
-          log('입 열림 → 서보 재구동');
-          servoState = 'ON';
-          mouthOpen = true;
-          updateDisplay();
-        } else if (mouthOpen && !mouthNowOpen) {
-          // 열림 → 닫힘
+        // 왼쪽 눈 감김 → 서보 닫기 (숫자 7)
+        if (!leftEyeClosed && eyeStatus.leftClosed) {
           sendMessage('서보OFF', '7');
-          log('입 닫힘 → 서보 구동');
+          log('왼쪽 눈 감김 → 서보 구동');
           servoState = 'OFF';
-          mouthOpen = false;
+          leftEyeClosed = true;
           updateDisplay();
+        } else if (leftEyeClosed && !eyeStatus.leftClosed) {
+          leftEyeClosed = false;
+        }
+        
+        // 오른쪽 눈 감김 → 서보 열기 (숫자 9)
+        if (!rightEyeClosed && eyeStatus.rightClosed) {
+          sendMessage('서보ON', '9');
+          log('오른쪽 눈 감김 → 서보 재구동');
+          servoState = 'ON';
+          rightEyeClosed = true;
+          updateDisplay();
+        } else if (rightEyeClosed && !eyeStatus.rightClosed) {
+          rightEyeClosed = false;
         }
 
-        // 입 점 그리기 (항상 표시)
-        const mx = mouth.x * canvasElement.width;
-        const my = mouth.y * canvasElement.height;
-        
-        canvasCtx.beginPath();
-        canvasCtx.arc(mx, my, 14, 0, 2 * Math.PI);
-        canvasCtx.fillStyle = mouthColor;
-        canvasCtx.fill();
-        
-        canvasCtx.beginPath();
-        canvasCtx.arc(mx - 2, my - 2, 5, 0, 2 * Math.PI);
-        canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-        canvasCtx.fill();
-        
-        canvasCtx.beginPath();
-        canvasCtx.arc(mx, my, 14, 0, 2 * Math.PI);
-        canvasCtx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-        canvasCtx.lineWidth = 3;
-        canvasCtx.stroke();
+        // 눈 점 그리기 (항상 표시)
+        const drawEye = (eye, isClosed, label) => {
+          const x = eye.x * canvasElement.width;
+          const y = eye.y * canvasElement.height;
+          const color = isClosed ? COLORS.eyeClosed : COLORS.eyeOpen;
+          
+          canvasCtx.beginPath();
+          canvasCtx.arc(x, y, 12, 0, 2 * Math.PI);
+          canvasCtx.fillStyle = color;
+          canvasCtx.fill();
+          
+          canvasCtx.beginPath();
+          canvasCtx.arc(x - 2, y - 2, 4, 0, 2 * Math.PI);
+          canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+          canvasCtx.fill();
+          
+          canvasCtx.beginPath();
+          canvasCtx.arc(x, y, 12, 0, 2 * Math.PI);
+          canvasCtx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+          canvasCtx.lineWidth = 2.5;
+          canvasCtx.stroke();
+        };
+
+        drawEye(leftEye, eyeStatus.leftClosed, '왼눈');
+        drawEye(rightEye, eyeStatus.rightClosed, '오른눈');
 
         // 손목 좌표를 주먹 위치로 조정 (y값을 올려서 손등 쪽으로)
         const leftFist = {
