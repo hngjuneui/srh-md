@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>웹 AI 포즈 모델 조종기</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #f2f2f7;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      color: #1c1c1e;
+      margin: 0;
+    }
+
+    .main-container {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+
+    h2 {
+      font-size: 1.5em;
+      color: #007aff;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .canvas-container {
+      position: relative;
+      width: 100%;
+      max-width: 400px;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    canvas {
+      max-width: 100%;
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    #status-box {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 12px;
+      background-color: #ffffff;
+      border: 1px solid #ccc;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+      font-size: 0.9em;
+    }
+
+    #speed-display {
+      margin-top: 10px;
+      padding: 15px;
+      border-radius: 12px;
+      background-color: #007aff;
+      color: white;
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+      font-size: 1.2em;
+      font-weight: 600;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    pre#log {
+      margin-top: 15px;
+      background: #ffffff;
+      padding: 14px 18px;
+      width: 100%;
+      max-width: 400px;
+      height: 120px;
+      overflow-y: auto;
+      border-radius: 12px;
+      border: 1px solid #d1d1d6;
+      font-size: 0.9em;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+      white-space: pre-wrap;
+    }
+
+    button {
+      width: 100%;
+      max-width: 400px;
+      padding: 12px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 12px;
+      background-color: #007aff;
+      color: white;
+      font-size: 1em;
+      font-weight: 500;
+      cursor: pointer;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #005ecb;
+    }
+
+    video.hidden {
+      display: none;
+    }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
+</head>
+<body>
+  <h2>웹 AI 포즈 모델 조종기</h2>
+  <div id="status-box">
+    <div id="status">화면을 터치하여 기기 검색...</div>
+  </div>
+  
+  <div class="main-container">
+    <div class="canvas-container">
+      <canvas id="outputCanvas"></canvas>
+    </div>
+  </div>
+  
+  <div id="speed-display">속도: 0단계 | 방향: 직진 | 서보: OFF</div>
+  
+  <pre id="log"></pre>
+  <video id="camera" autoplay playsinline class="hidden"></video>
+
+  <script>
+    let device;
+    let writeCharacteristic;
+    
+    // 상태 변수
+    let currentSpeed = 0; // 0~10단계
+    let lastDirection = '직진'; // 좌회전, 우회전, 직진
+    let servoState = 'OFF'; // OFF, ON
+    let lastDistance = 0;
+    let mouthOpen = false;
+
+    const log = (msg) => {
+      const el = document.getElementById('log');
+      el.textContent += msg + '\n';
+      el.scrollTop = el.scrollHeight;
+    };
+
+    const updateStatus = (text) => {
+      document.getElementById('status').textContent = '상태: ' + text;
+    };
+
+    const updateDisplay = () => {
+      document.getElementById('speed-display').textContent = 
+        `속도: ${currentSpeed}단계 | 방향: ${lastDirection} | 서보: ${servoState}`;
+    };
+
+    async function connectBLE() {
+      try {
+        device = await navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: ['00c0ffee-1234-1234-1234-123456789abc']
+        });
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService('00c0ffee-1234-1234-1234-123456789abc');
+        writeCharacteristic = await service.getCharacteristic('00c0ffee-4321-4321-4321-cba987654321');
+        log('BLE 연결 성공: ' + device.name);
+        updateStatus('연결됨 (' + device.name + ')');
+
+        device.addEventListener('gattserverdisconnected', () => {
+          log('BLE 연결 끊김.');
+          updateStatus('연결 끊김');
+          writeCharacteristic = null;
+        });
+      } catch (e) {
+        log('BLE 연결 실패: ' + e);
+        updateStatus('연결 실패');
+      }
+    }
+
+    function sendMessage(label, msg) {
+      if (!writeCharacteristic) return;
+      const encoder = new TextEncoder();
+      writeCharacteristic.writeValue(encoder.encode(msg + '\n'))
+        .then(() => log(`[${label}] 전송: ${msg}`))
+        .catch(err => log(`[${label}] 전송 실패: ${err}`));
+    }
+
+    const videoElement = document.getElementById('camera');
+    const canvasElement = document.getElementById('outputCanvas');
+    const canvasCtx = canvasElement.getContext('2d');
+
+    function adjustCanvasSize() {
+      if (videoElement.videoWidth && videoElement.videoHeight) {
+        canvasElement.width = videoElement.videoWidth;
+        canvasElement.height = videoElement.videoHeight;
+      }
+    }
+
+    // 두 점 사이의 거리 계산
+    function getDistance(p1, p2) {
+      const dx = p1.x - p2.x;
+      const dy = p1.y - p2.y;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    // 두 점을 잇는 직선의 각도 계산 (도 단위)
+    function getAngle(p1, p2) {
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      return Math.atan2(dy, dx) * 180 / Math.PI;
+    }
+
+    // 입이 열려있는지 확인
+    function isMouthOpen(landmarks) {
+      const upperLip = landmarks[13]; // 상순
+      const lowerLip = landmarks[14]; // 하순
+      const distance = getDistance(upperLip, lowerLip);
+      return distance > 0.02; // 임계값
+    }
+
+    const pose = new Pose({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+    });
+
+    pose.setOptions({
+      modelComplexity: 1,
+      smoothLandmarks: true,
+      enableSegmentation: false,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+
+    pose.onResults(results => {
+      adjustCanvasSize();
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+      canvasCtx.translate(canvasElement.width, 0);
+      canvasCtx.scale(-1, 1);
+      canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+
+      if (results.poseLandmarks) {
+        const landmarks = results.poseLandmarks;
+        
+        // 주먹 좌표 (손목 사용)
+        const leftFist = landmarks[15];  // 왼쪽 손목
+        const rightFist = landmarks[16]; // 오른쪽 손목
+        const mouth = landmarks[10];     // 입 (코 끝 사용)
+
+        // 좌표 그리기
+        const drawPoint = (point, color, label) => {
+          const x = point.x * canvasElement.width;
+          const y = point.y * canvasElement.height;
+          
+          canvasCtx.beginPath();
+          canvasCtx.arc(x, y, 10, 0, 2 * Math.PI);
+          canvasCtx.fillStyle = color;
+          canvasCtx.fill();
+          canvasCtx.strokeStyle = 'white';
+          canvasCtx.lineWidth = 2;
+          canvasCtx.stroke();
+          
+          canvasCtx.fillStyle = 'white';
+          canvasCtx.font = 'bold 16px Arial';
+          canvasCtx.fillText(label, x + 15, y + 5);
+        };
+
+        drawPoint(leftFist, '#FF0000', '왼손');
+        drawPoint(rightFist, '#0000FF', '오른손');
+        drawPoint(mouth, '#00FF00', '입');
+
+        // 두 주먹 사이에 선 그리기
+        canvasCtx.beginPath();
+        canvasCtx.moveTo(leftFist.x * canvasElement.width, leftFist.y * canvasElement.height);
+        canvasCtx.lineTo(rightFist.x * canvasElement.width, rightFist.y * canvasElement.height);
+        canvasCtx.strokeStyle = '#FFFF00';
+        canvasCtx.lineWidth = 3;
+        canvasCtx.stroke();
+
+        // 거리 계산 (정규화된 좌표 기준)
+        const distance = getDistance(leftFist, rightFist);
+        
+        // 속도 제어 (거리 변화에 따라)
+        const STOP_THRESHOLD = 0.15; // 정지 임계값
+        const MAX_DISTANCE = 1.0; // 최대 거리
+        
+        if (distance < STOP_THRESHOLD) {
+          // 정지
+          if (currentSpeed !== 0) {
+            currentSpeed = 0;
+            sendMessage('정지', '5');
+            log('주먹이 가까움 → 정지 (속도: 0단계)');
+            updateDisplay();
+          }
+        } else {
+          // 거리가 멀어지면 속도 증가
+          if (distance > lastDistance + 0.02) {
+            if (currentSpeed < 10) {
+              currentSpeed++;
+              sendMessage('속도증가', '3');
+              log(`거리 증가 → 속도 증가 (${currentSpeed}단계)`);
+              updateDisplay();
+            }
+          }
+          // 거리가 가까워지면 속도 감소
+          else if (distance < lastDistance - 0.02) {
+            if (currentSpeed > 0) {
+              currentSpeed--;
+              sendMessage('속도감소', '1');
+              log(`거리 감소 → 속도 감소 (${currentSpeed}단계)`);
+              updateDisplay();
+            }
+          }
+        }
+        
+        lastDistance = distance;
+
+        // 방향 제어 (두 주먹을 잇는 직선의 각도)
+        const angle = getAngle(leftFist, rightFist);
+        let newDirection = lastDirection;
+        
+        // 각도에 따른 방향 결정
+        // -20도 ~ 20도: 직진
+        // 20도 이상: 우회전
+        // -20도 이하: 좌회전
+        if (angle > 20) {
+          newDirection = '우회전';
+          if (lastDirection !== '우회전') {
+            sendMessage('우회전', '6');
+            log(`각도 변화 (${angle.toFixed(1)}°) → 우회전`);
+            lastDirection = '우회전';
+            updateDisplay();
+          }
+        } else if (angle < -20) {
+          newDirection = '좌회전';
+          if (lastDirection !== '좌회전') {
+            sendMessage('좌회전', '4');
+            log(`각도 변화 (${angle.toFixed(1)}°) → 좌회전`);
+            lastDirection = '좌회전';
+            updateDisplay();
+          }
+        } else {
+          newDirection = '직진';
+          if (lastDirection !== '직진') {
+            log(`각도 변화 (${angle.toFixed(1)}°) → 직진`);
+            lastDirection = '직진';
+            updateDisplay();
+          }
+        }
+
+        // 입 상태 확인 (서보모터 제어)
+        const mouthNowOpen = isMouthOpen(landmarks);
+        
+        if (!mouthOpen && mouthNowOpen) {
+          // 입을 열었을 때
+          sendMessage('서보ON', '9');
+          log('입 열림 → 서보모터 재구동');
+          servoState = 'ON';
+          updateDisplay();
+        } else if (mouthOpen && !mouthNowOpen) {
+          // 입을 닫았을 때
+          sendMessage('서보OFF', '7');
+          log('입 닫힘 → 서보모터 구동');
+          servoState = 'OFF';
+          updateDisplay();
+        }
+        
+        mouthOpen = mouthNowOpen;
+      }
+
+      canvasCtx.restore();
+    });
+
+    async function startCamera() {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+      videoElement.srcObject = stream;
+      videoElement.play();
+      videoElement.onloadedmetadata = () => adjustCanvasSize();
+    }
+
+    const camera = new Camera(videoElement, {
+      onFrame: async () => {
+        await pose.send({ image: videoElement });
+      },
+      width: 480,
+      height: 640
+    });
+
+    window.onload = async () => {
+      await startCamera();
+      camera.start();
+
+      if (navigator.bluetooth) {
+        log('BLE를 연결하려면 화면을 클릭하세요.');
+        updateStatus('연결 대기 중');
+        document.body.addEventListener('click', async () => {
+          if (!writeCharacteristic) {
+            await connectBLE();
+          }
+        }, { once: true });
+      } else {
+        log('이 브라우저는 Web Bluetooth를 지원하지 않습니다.');
+        updateStatus('미지원');
+      }
+    };
+  </script>
+
+  <div style="width: 100%; max-width: 400px; text-align: center; padding: 10px 0; margin-top: 20px; font-size: 0.8em; color: #8e8e93;">
+    <hr style="border: none; border-top: 1px solid #d1d1d6; margin: 10px 0;">
+    2025 Teacher Jun, Dept. of Robotics Mechanical Design, Seoul Robotics Highschool
+  </div>
+</body>
+</html>
