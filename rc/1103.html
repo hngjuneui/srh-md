@@ -528,17 +528,7 @@
                 rightWrist.x - leftWrist.x
             ) * 180 / Math.PI;
 
-            const isCrossed = leftWrist.x < rightWrist.x;
-
-            if (!isCrossed) {
-                if (currentSpeed !== 3) {
-                    currentSpeed = 3;
-                    sendBLECommand(BACKWARD_CMD);
-                    updateStatus(3, 'straight', '후진');
-                    addLog('후진 모드 (3단 고정)');
-                }
-                return;
-            }
+            const isCrossed = leftWrist.x > rightWrist.x;
 
             if (distance < STOP_THRESHOLD || distance < DEADZONE_THRESHOLD) {
                 if (currentSpeed !== 0) {
