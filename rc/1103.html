@@ -223,7 +223,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🚗 RC Car Controller</h1>
+        <h1>🚗1 RC Car Controller</h1>
         
         <div class="controls">
             <button id="connectBtn">BLE 연결</button>
@@ -340,6 +340,7 @@
                     const encoder = new TextEncoder();
                     await bleCharacteristic.writeValue(encoder.encode(command + '\n'));
                     lastCommand = command;
+                    addLog(`시리얼 출력: ${command}`);
                 } catch (error) {
                     console.error('BLE 전송 실패:', error);
                 }
