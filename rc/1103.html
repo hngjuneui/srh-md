@@ -223,7 +223,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>2🚗 RC Car Controller</h1>
+        <h1>3🚗 RC Car Controller</h1>
         
         <div class="controls">
             <button id="connectBtn">BLE 연결</button>
@@ -418,14 +418,21 @@
                 };
 
                 if (leftWrist.visibility > 0.5 && rightWrist.visibility > 0.5) {
-                    if (leftWrist.x < 0 || leftWrist.x > 1 || leftWrist.y < 0 || leftWrist.y > 1 ||
-                        rightWrist.x < 0 || rightWrist.x > 1 || rightWrist.y < 0 || rightWrist.y > 1) {
-                        sendBLECommand(STOP_CMD);
-                        updateStatus(0, 'straight', '정지');
-                        addLog('주먹이 화면 밖 - 정지');
-                    } else {
-                        drawPoint(canvasCtx, leftWrist, '#FF6B6B', 18);
-                        drawPoint(canvasCtx, rightWrist, '#4ECDC4', 18);
+                    const isLeftOutOfBounds = leftWrist.x < 0 || leftWrist.x > 1 || leftWrist.y < 0 || leftWrist.y > 1;
+                    const isRightOutOfBounds = rightWrist.x < 0 || rightWrist.x > 1 || rightWrist.y < 0 || rightWrist.y > 1;
+                    
+                    if (isLeftOutOfBounds || isRightOutOfBounds) {
+                        if (currentSpeed !== 0) {
+                            sendBLECommand(STOP_CMD);
+                            currentSpeed = 0;
+                            updateStatus(0, 'straight', '정지');
+                        }
+                        canvasCtx.restore();
+                        return;
+                    }
+                    
+                    drawPoint(canvasCtx, leftWrist, '#FF6B6B', 18);
+                    drawPoint(canvasCtx, rightWrist, '#4ECDC4', 18);
 
                         const leftFistCanvas = {
                             x: leftWrist.x * canvas.width,
@@ -448,8 +455,11 @@
                         processWristControl(leftWrist, rightWrist);
                     }
                 } else {
-                    sendBLECommand(STOP_CMD);
-                    updateStatus(0, 'straight', '정지');
+                    if (currentSpeed !== 0) {
+                        sendBLECommand(STOP_CMD);
+                        currentSpeed = 0;
+                        updateStatus(0, 'straight', '정지');
+                    }
                 }
             }
 
