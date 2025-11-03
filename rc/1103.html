@@ -187,7 +187,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>6🚗 RC Car Controller</h1>
+        <h1>7🚗 RC Car Controller</h1>
         
         <div class="controls">
             <button id="connectBtn">BLE 연결</button>
@@ -250,7 +250,6 @@
         let rightEyeClosedTime = 0;
         let isLeftEyeClosed = false;
         let isRightEyeClosed = false;
-        let lastForwardTime = 0; 
 
         // BLE 명령어
         const FORWARD_CMD = '8';
@@ -354,7 +353,6 @@
         }
 
         let faceResults = null;
-        
 
         function onFaceResults(results) {
             faceResults = results;
@@ -491,51 +489,56 @@
             ctx.lineWidth = 2;
             ctx.stroke();
         }
-    
+
         function processWristControl(leftWrist, rightWrist) {
             const distance = Math.sqrt(
                 Math.pow(leftWrist.x - rightWrist.x, 2) +
                 Math.pow(leftWrist.y - rightWrist.y, 2)
             );
+
             document.getElementById('distanceStatus').textContent = distance.toFixed(2);
-    
+
+            // 손 교차 체크 (좌우 반전된 화면이므로 leftWrist.x > rightWrist.x가 교차)
             const isCrossed = leftWrist.x > rightWrist.x;
-    
+
             if (isCrossed) {
+                // 후진 - 4단 고정 (206)
                 if (currentMode !== 'backward') {
                     sendBLECommand(BACKWARD_CMD);
                     currentMode = 'backward';
-                    currentSpeed = 3;
-                    updateStatus('후진', 3);
+                    currentSpeed = 4;
+                    updateStatus('후진', 4);
                 }
             } else if (distance >= FORWARD_DISTANCE_MIN) {
+                // 전진 - 거리에 따라 1~5단
+                // 0.3 ~ 0.9 사이를 1~5단으로 매핑
                 const speedLevel = Math.min(5, Math.max(1, 
                     Math.floor(((distance - FORWARD_DISTANCE_MIN) / (FORWARD_DISTANCE_MAX - FORWARD_DISTANCE_MIN)) * 5) + 1
                 ));
-    
+
                 if (currentMode !== 'forward') {
                     sendBLECommand(FORWARD_CMD);
                     currentMode = 'forward';
-                    lastForwardTime = Date.now();  // ✅ 전진 시각 기록
                 }
-    
-                if (Date.now() - lastForwardTime > 300) { // ✅ 전진 후 0.3초 동안 속도 변경 금지
-                    if (currentSpeed !== speedLevel) {
-                        if (speedLevel > currentSpeed) {
-                            for (let i = currentSpeed; i < speedLevel; i++) {
-                                sendBLECommand(SPEED_1_CMD);
-                            }
-                        } else {
-                            for (let i = currentSpeed; i > speedLevel; i--) {
-                                sendBLECommand(SPEED_DOWN_CMD);
-                            }
+
+                if (currentSpeed !== speedLevel) {
+                    // 속도 변경
+                    if (speedLevel > currentSpeed) {
+                        // 속도 증가
+                        for (let i = currentSpeed; i < speedLevel; i++) {
+                            sendBLECommand(SPEED_1_CMD);
                         }
-                        currentSpeed = speedLevel;
-                        updateStatus('전진', speedLevel);
+                    } else {
+                        // 속도 감소
+                        for (let i = currentSpeed; i > speedLevel; i--) {
+                            sendBLECommand(SPEED_DOWN_CMD);
+                        }
                     }
+                    currentSpeed = speedLevel;
+                    updateStatus('전진', speedLevel);
                 }
-    
             } else {
+                // 정지
                 if (currentMode !== 'stop') {
                     sendBLECommand(STOP_CMD);
                     currentMode = 'stop';
@@ -544,6 +547,7 @@
                 }
             }
         }
+
         function calculateEAR(eyeTop, eyeBottom, eyeLeft, eyeRight) {
             const verticalDist = Math.sqrt(
                 Math.pow(eyeTop.x - eyeBottom.x, 2) +
