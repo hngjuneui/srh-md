@@ -99,40 +99,35 @@
             display: block;
         }
 
-        .status-panel {
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
             background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
             border-radius: 20px;
-            padding: 20px;
+            padding: 15px;
             margin-bottom: 15px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
         }
 
-        .status-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px;
-            margin-bottom: 8px;
+        .status-grid-item {
             background: rgba(255, 255, 255, 0.7);
             border-radius: 12px;
-            font-size: 14px;
+            padding: 12px;
+            text-align: center;
         }
 
-        .status-item:last-child {
-            margin-bottom: 0;
-        }
-
-        .status-label {
+        .status-grid-label {
+            font-size: 12px;
             font-weight: 600;
             color: #764ba2;
+            margin-bottom: 5px;
         }
 
-        .status-value {
+        .status-grid-value {
+            font-size: 16px;
             font-weight: 700;
             color: #667eea;
-            padding: 4px 12px;
-            background: rgba(255, 255, 255, 0.9);
-            border-radius: 8px;
         }
 
         .log-panel {
@@ -173,37 +168,6 @@
             color: #842029;
         }
 
-        .status-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
-            border-radius: 20px;
-            padding: 15px;
-            margin-bottom: 15px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-        }
-
-        .status-grid-item {
-            background: rgba(255, 255, 255, 0.7);
-            border-radius: 12px;
-            padding: 12px;
-            text-align: center;
-        }
-
-        .status-grid-label {
-            font-size: 12px;
-            font-weight: 600;
-            color: #764ba2;
-            margin-bottom: 5px;
-        }
-
-        .status-grid-value {
-            font-size: 16px;
-            font-weight: 700;
-            color: #667eea;
-        }
-
         .footer {
             width: 100%;
             max-width: 400px;
@@ -223,7 +187,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>3🚗 RC Car Controller</h1>
+        <h1>4🚗 RC Car Controller</h1>
         
         <div class="controls">
             <button id="connectBtn">BLE 연결</button>
@@ -241,20 +205,20 @@
 
         <div class="status-grid">
             <div class="status-grid-item">
-                <div class="status-grid-label">속도</div>
-                <div class="status-grid-value" id="speedStatus">0단</div>
-            </div>
-            <div class="status-grid-item">
-                <div class="status-grid-label">방향</div>
-                <div class="status-grid-value" id="directionStatus">정지</div>
-            </div>
-            <div class="status-grid-item">
                 <div class="status-grid-label">모드</div>
                 <div class="status-grid-value" id="modeStatus">정지</div>
             </div>
             <div class="status-grid-item">
+                <div class="status-grid-label">속도</div>
+                <div class="status-grid-value" id="speedStatus">0</div>
+            </div>
+            <div class="status-grid-item">
                 <div class="status-grid-label">서보</div>
                 <div class="status-grid-value" id="servoStatus">대기</div>
+            </div>
+            <div class="status-grid-item">
+                <div class="status-grid-label">거리</div>
+                <div class="status-grid-value" id="distanceStatus">0.00</div>
             </div>
         </div>
 
@@ -279,26 +243,21 @@
         const canvas = document.getElementById('canvasElement');
         const canvasCtx = canvas.getContext('2d');
         
-        let currentSpeed = 0;
-        let currentDirection = 'straight';
+        let currentMode = 'stop';
         let lastCommand = '';
         let leftEyeClosedTime = 0;
         let rightEyeClosedTime = 0;
         let isLeftEyeClosed = false;
         let isRightEyeClosed = false;
-        let lastDistance = 0;
 
-        const SPEED_INCREASE_CMD = '3';
-        const SPEED_DECREASE_CMD = '1';
+        // BLE 명령어
+        const FORWARD_CMD = '8';
+        const BACKWARD_CMD = '2';
         const STOP_CMD = '5';
-        const RIGHT_TURN_CMD = '6';
-        const LEFT_TURN_CMD = '4';
         const SERVO_LEFT_CMD = '7';
         const SERVO_RIGHT_CMD = '9';
-        const BACKWARD_CMD = '2';
-        const FORWARD_CMD = '8';
 
-        const ANGLE_DEADZONE = 15;
+        // 임계값
         const FORWARD_DISTANCE_THRESHOLD = 0.3;
         const EYE_CLOSED_DURATION = 500;
 
@@ -319,7 +278,7 @@
                 document.getElementById('bleStatus').textContent = 'BLE 연결됨: ' + bleDevice.name;
                 document.getElementById('bleStatus').className = 'ble-status ble-connected';
                 document.getElementById('startBtn').disabled = false;
-                addLog('BLE 기기 연결 성공: ' + bleDevice.name);
+                addLog('BLE 연결 성공: ' + bleDevice.name);
 
                 bleDevice.addEventListener('gattserverdisconnected', () => {
                     addLog('BLE 연결 끊김');
@@ -384,7 +343,7 @@
 
             camera.start();
             document.getElementById('startBtn').disabled = true;
-            addLog('카메라 시작됨');
+            addLog('카메라 시작');
         }
 
         let faceResults = null;
@@ -422,17 +381,14 @@
                     const isRightOutOfBounds = rightWrist.x < 0 || rightWrist.x > 1 || rightWrist.y < 0 || rightWrist.y > 1;
                     
                     if (isLeftOutOfBounds || isRightOutOfBounds) {
-                        if (currentSpeed !== 0) {
+                        if (currentMode !== 'stop') {
                             sendBLECommand(STOP_CMD);
-                            currentSpeed = 0;
-                            updateStatus(0, 'straight', '정지');
+                            currentMode = 'stop';
+                            updateStatus('정지', 0);
                         }
-                        canvasCtx.restore();
-                        return;
-                    }
-                    
-                    drawPoint(canvasCtx, leftWrist, '#FF6B6B', 18);
-                    drawPoint(canvasCtx, rightWrist, '#4ECDC4', 18);
+                    } else {
+                        drawPoint(canvasCtx, leftWrist, '#FF6B6B', 18);
+                        drawPoint(canvasCtx, rightWrist, '#4ECDC4', 18);
 
                         const leftFistCanvas = {
                             x: leftWrist.x * canvas.width,
@@ -455,10 +411,10 @@
                         processWristControl(leftWrist, rightWrist);
                     }
                 } else {
-                    if (currentSpeed !== 0) {
+                    if (currentMode !== 'stop') {
                         sendBLECommand(STOP_CMD);
-                        currentSpeed = 0;
-                        updateStatus(0, 'straight', '정지');
+                        currentMode = 'stop';
+                        updateStatus('정지', 0);
                     }
                 }
             }
@@ -533,67 +489,31 @@
                 Math.pow(leftWrist.y - rightWrist.y, 2)
             );
 
-            const angle = Math.atan2(
-                rightWrist.y - leftWrist.y,
-                rightWrist.x - leftWrist.x
-            ) * 180 / Math.PI;
+            document.getElementById('distanceStatus').textContent = distance.toFixed(2);
 
+            // 손 교차 체크 (좌우 반전된 화면이므로 leftWrist.x > rightWrist.x가 교차)
             const isCrossed = leftWrist.x > rightWrist.x;
 
-            if (distance < STOP_THRESHOLD || distance < DEADZONE_THRESHOLD) {
-                if (currentSpeed !== 0) {
-                    sendBLECommand(STOP_CMD);
-                    currentSpeed = 0;
-                    updateStatus(0, 'straight', '정지');
-                    addLog('주먹 근접 - 정지');
+            if (isCrossed) {
+                // 후진
+                if (currentMode !== 'backward') {
+                    sendBLECommand(BACKWARD_CMD);
+                    currentMode = 'backward';
+                    updateStatus('후진', 3);
                 }
-                return;
-            }
-
-            if (distance > lastDistance + 0.015) {
-                if (currentSpeed < 5) {
-                    sendBLECommand(SPEED_INCREASE_CMD);
-                    currentSpeed++;
-                    const actualSpeed = Math.floor((currentSpeed / 5) * 255);
-                    updateStatus(currentSpeed, currentDirection, '전진');
-                    addLog(`속도 증가: ${currentSpeed}단 (${actualSpeed})`);
-                }
-            } else if (distance < lastDistance - 0.015) {
-                if (currentSpeed > 1) {
-                    sendBLECommand(SPEED_DECREASE_CMD);
-                    currentSpeed--;
-                    const actualSpeed = Math.floor((currentSpeed / 5) * 255);
-                    updateStatus(currentSpeed, currentDirection, '전진');
-                    addLog(`속도 감소: ${currentSpeed}단 (${actualSpeed})`);
-                }
-            }
-
-            lastDistance = distance;
-
-            let newDirection = 'straight';
-            if (Math.abs(angle) <= ANGLE_DEADZONE) {
-                newDirection = 'straight';
-                if (currentDirection !== 'straight') {
+            } else if (distance >= FORWARD_DISTANCE_THRESHOLD) {
+                // 전진
+                if (currentMode !== 'forward') {
                     sendBLECommand(FORWARD_CMD);
-                    currentDirection = 'straight';
-                    updateStatus(currentSpeed, currentDirection, '전진');
-                    addLog('직진');
+                    currentMode = 'forward';
+                    updateStatus('전진', 5);
                 }
-            } else if (angle > ANGLE_DEADZONE) {
-                newDirection = 'left';
-                if (currentDirection !== 'left') {
-                    sendBLECommand(LEFT_TURN_CMD);
-                    currentDirection = 'left';
-                    updateStatus(currentSpeed, currentDirection, '전진');
-                    addLog('좌회전');
-                }
-            } else if (angle < -ANGLE_DEADZONE) {
-                newDirection = 'right';
-                if (currentDirection !== 'right') {
-                    sendBLECommand(RIGHT_TURN_CMD);
-                    currentDirection = 'right';
-                    updateStatus(currentSpeed, currentDirection, '전진');
-                    addLog('우회전');
+            } else {
+                // 정지
+                if (currentMode !== 'stop') {
+                    sendBLECommand(STOP_CMD);
+                    currentMode = 'stop';
+                    updateStatus('정지', 0);
                 }
             }
         }
@@ -640,30 +560,22 @@
 
             if (isLeftEyeClosed && (currentTime - leftEyeClosedTime) >= EYE_CLOSED_DURATION) {
                 sendBLECommand(SERVO_LEFT_CMD);
-                document.getElementById('servoStatus').textContent = '왼쪽 작동';
-                addLog('왼쪽 눈 감김 - 서보모터 작동');
+                document.getElementById('servoStatus').textContent = '왼쪽';
                 isLeftEyeClosed = false;
                 leftEyeClosedTime = 0;
             }
 
             if (isRightEyeClosed && (currentTime - rightEyeClosedTime) >= EYE_CLOSED_DURATION) {
                 sendBLECommand(SERVO_RIGHT_CMD);
-                document.getElementById('servoStatus').textContent = '오른쪽 작동';
-                addLog('오른쪽 눈 감김 - 서보모터 재작동');
+                document.getElementById('servoStatus').textContent = '오른쪽';
                 isRightEyeClosed = false;
                 rightEyeClosedTime = 0;
             }
         }
 
-        function updateStatus(speed, direction, mode) {
-            document.getElementById('speedStatus').textContent = speed + '단';
-            
-            let dirText = '직진';
-            if (direction === 'left') dirText = '좌회전';
-            else if (direction === 'right') dirText = '우회전';
-            document.getElementById('directionStatus').textContent = dirText;
-            
+        function updateStatus(mode, speed) {
             document.getElementById('modeStatus').textContent = mode;
+            document.getElementById('speedStatus').textContent = speed;
         }
 
         function addLog(message) {
