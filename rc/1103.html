@@ -223,7 +223,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🚗1 RC Car Controller</h1>
+        <h1>🚗 RC Car Controller</h1>
         
         <div class="controls">
             <button id="connectBtn">BLE 연결</button>
@@ -299,8 +299,7 @@
         const FORWARD_CMD = '8';
 
         const ANGLE_DEADZONE = 15;
-        const STOP_THRESHOLD = 0.12;
-        const DEADZONE_THRESHOLD = 0.16;
+        const FORWARD_DISTANCE_THRESHOLD = 0.3;
         const EYE_CLOSED_DURATION = 500;
 
         document.getElementById('connectBtn').addEventListener('click', connectBLE);
