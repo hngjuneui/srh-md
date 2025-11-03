@@ -187,7 +187,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>5🚗 RC Car Controller</h1>
+        <h1>6🚗 RC Car Controller</h1>
         
         <div class="controls">
             <button id="connectBtn">BLE 연결</button>
@@ -244,6 +244,7 @@
         const canvasCtx = canvas.getContext('2d');
         
         let currentMode = 'stop';
+        let currentSpeed = 0;
         let lastCommand = '';
         let leftEyeClosedTime = 0;
         let rightEyeClosedTime = 0;
@@ -254,12 +255,18 @@
         const FORWARD_CMD = '8';
         const BACKWARD_CMD = '2';
         const STOP_CMD = '5';
+        const SPEED_1_CMD = '3';  // 속도 증가
+        const SPEED_DOWN_CMD = '1';  // 속도 감소
         const SERVO_LEFT_CMD = '7';
         const SERVO_RIGHT_CMD = '9';
 
         // 임계값
-        const FORWARD_DISTANCE_THRESHOLD = 0.3;
+        const FORWARD_DISTANCE_MIN = 0.3;  // 전진 시작 (1단)
+        const FORWARD_DISTANCE_MAX = 0.9;  // 최대 속도 (5단)
         const EYE_CLOSED_DURATION = 500;
+
+        // 속도 매핑 (1~5단)
+        const SPEED_VALUES = [0, 51, 102, 153, 204, 255];  // 0단, 1단~5단
 
         document.getElementById('connectBtn').addEventListener('click', connectBLE);
         document.getElementById('startBtn').addEventListener('click', startCamera);
@@ -293,11 +300,10 @@
         }
 
         async function sendBLECommand(command) {
-            if (bleCharacteristic && command !== lastCommand) {
+            if (bleCharacteristic) {
                 try {
                     const encoder = new TextEncoder();
                     await bleCharacteristic.writeValue(encoder.encode(command + '\n'));
-                    lastCommand = command;
                     addLog(`시리얼 출력: ${command}`);
                 } catch (error) {
                     console.error('BLE 전송 실패:', error);
@@ -496,24 +502,47 @@
             const isCrossed = leftWrist.x > rightWrist.x;
 
             if (isCrossed) {
-                // 후진
+                // 후진 - 3단 고정 (155)
                 if (currentMode !== 'backward') {
                     sendBLECommand(BACKWARD_CMD);
                     currentMode = 'backward';
+                    currentSpeed = 3;
                     updateStatus('후진', 3);
                 }
-            } else if (distance >= FORWARD_DISTANCE_THRESHOLD) {
-                // 전진
+            } else if (distance >= FORWARD_DISTANCE_MIN) {
+                // 전진 - 거리에 따라 1~5단
+                // 0.3 ~ 0.9 사이를 1~5단으로 매핑
+                const speedLevel = Math.min(5, Math.max(1, 
+                    Math.floor(((distance - FORWARD_DISTANCE_MIN) / (FORWARD_DISTANCE_MAX - FORWARD_DISTANCE_MIN)) * 5) + 1
+                ));
+
                 if (currentMode !== 'forward') {
                     sendBLECommand(FORWARD_CMD);
                     currentMode = 'forward';
-                    updateStatus('전진', 5);
+                }
+
+                if (currentSpeed !== speedLevel) {
+                    // 속도 변경
+                    if (speedLevel > currentSpeed) {
+                        // 속도 증가
+                        for (let i = currentSpeed; i < speedLevel; i++) {
+                            sendBLECommand(SPEED_1_CMD);
+                        }
+                    } else {
+                        // 속도 감소
+                        for (let i = currentSpeed; i > speedLevel; i--) {
+                            sendBLECommand(SPEED_DOWN_CMD);
+                        }
+                    }
+                    currentSpeed = speedLevel;
+                    updateStatus('전진', speedLevel);
                 }
             } else {
                 // 정지
                 if (currentMode !== 'stop') {
                     sendBLECommand(STOP_CMD);
                     currentMode = 'stop';
+                    currentSpeed = 0;
                     updateStatus('정지', 0);
                 }
             }
