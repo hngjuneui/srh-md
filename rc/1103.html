@@ -173,30 +173,35 @@
             color: #842029;
         }
 
-        .legend {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            border-radius: 20px;
+            padding: 15px;
             margin-bottom: 15px;
-            flex-wrap: wrap;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
         }
 
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 6px 12px;
-            background: rgba(255, 255, 255, 0.8);
+        .status-grid-item {
+            background: rgba(255, 255, 255, 0.7);
             border-radius: 12px;
-            font-size: 13px;
-            font-weight: 600;
+            padding: 12px;
+            text-align: center;
         }
 
-        .legend-color {
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            border: 2px solid rgba(0, 0, 0, 0.2);
+        .status-grid-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #764ba2;
+            margin-bottom: 5px;
+        }
+
+        .status-grid-value {
+            font-size: 16px;
+            font-weight: 700;
+            color: #667eea;
         }
 
         .footer {
@@ -229,46 +234,27 @@
             BLE 연결 안됨
         </div>
 
-        <div class="legend">
-            <div class="legend-item">
-                <div class="legend-color" style="background: #FF6B6B;"></div>
-                <span>왼쪽 주먹</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-color" style="background: #4ECDC4;"></div>
-                <span>오른쪽 주먹</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-color" style="background: #FFD93D;"></div>
-                <span>왼쪽 눈</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-color" style="background: #95E1D3;"></div>
-                <span>오른쪽 눈</span>
-            </div>
-        </div>
-
         <div class="video-container">
             <video id="videoElement" autoplay playsinline></video>
             <canvas id="canvasElement"></canvas>
         </div>
 
-        <div class="status-panel">
-            <div class="status-item">
-                <span class="status-label">속도 단계</span>
-                <span class="status-value" id="speedStatus">0단</span>
+        <div class="status-grid">
+            <div class="status-grid-item">
+                <div class="status-grid-label">속도</div>
+                <div class="status-grid-value" id="speedStatus">0단</div>
             </div>
-            <div class="status-item">
-                <span class="status-label">방향</span>
-                <span class="status-value" id="directionStatus">정지</span>
+            <div class="status-grid-item">
+                <div class="status-grid-label">방향</div>
+                <div class="status-grid-value" id="directionStatus">정지</div>
             </div>
-            <div class="status-item">
-                <span class="status-label">서보모터</span>
-                <span class="status-value" id="servoStatus">대기</span>
+            <div class="status-grid-item">
+                <div class="status-grid-label">모드</div>
+                <div class="status-grid-value" id="modeStatus">정지</div>
             </div>
-            <div class="status-item">
-                <span class="status-label">주행 모드</span>
-                <span class="status-value" id="modeStatus">정지</span>
+            <div class="status-grid-item">
+                <div class="status-grid-label">서보</div>
+                <div class="status-grid-value" id="servoStatus">대기</div>
             </div>
         </div>
 
@@ -511,23 +497,24 @@
         }
 
         function drawEye(ctx, points, color) {
-            points.forEach(point => {
-                ctx.beginPath();
-                ctx.arc(point.x * canvas.width, point.y * canvas.height, 12, 0, 2 * Math.PI);
-                ctx.fillStyle = color;
-                ctx.fill();
-                
-                ctx.beginPath();
-                ctx.arc(point.x * canvas.width - 2, point.y * canvas.height - 2, 4, 0, 2 * Math.PI);
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-                ctx.fill();
-                
-                ctx.beginPath();
-                ctx.arc(point.x * canvas.width, point.y * canvas.height, 12, 0, 2 * Math.PI);
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-                ctx.lineWidth = 2.5;
-                ctx.stroke();
-            });
+            const centerX = (points[0].x + points[3].x) / 2 * canvas.width;
+            const centerY = (points[0].y + points[3].y) / 2 * canvas.height;
+            
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 10, 0, 2 * Math.PI);
+            ctx.fillStyle = color;
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(centerX - 2, centerY - 2, 3, 0, 2 * Math.PI);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 10, 0, 2 * Math.PI);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
         }
 
         function processWristControl(leftWrist, rightWrist) {
@@ -541,9 +528,9 @@
                 rightWrist.x - leftWrist.x
             ) * 180 / Math.PI;
 
-            const isCrossed = leftWrist.x > rightWrist.x;
+            const isCrossed = leftWrist.x < rightWrist.x;
 
-            if (isCrossed) {
+            if (!isCrossed) {
                 if (currentSpeed !== 3) {
                     currentSpeed = 3;
                     sendBLECommand(BACKWARD_CMD);
@@ -567,15 +554,17 @@
                 if (currentSpeed < 5) {
                     sendBLECommand(SPEED_INCREASE_CMD);
                     currentSpeed++;
+                    const actualSpeed = Math.floor((currentSpeed / 5) * 255);
                     updateStatus(currentSpeed, currentDirection, '전진');
-                    addLog(`속도 증가: ${currentSpeed}단`);
+                    addLog(`속도 증가: ${currentSpeed}단 (${actualSpeed})`);
                 }
             } else if (distance < lastDistance - 0.015) {
                 if (currentSpeed > 1) {
                     sendBLECommand(SPEED_DECREASE_CMD);
                     currentSpeed--;
+                    const actualSpeed = Math.floor((currentSpeed / 5) * 255);
                     updateStatus(currentSpeed, currentDirection, '전진');
-                    addLog(`속도 감소: ${currentSpeed}단`);
+                    addLog(`속도 감소: ${currentSpeed}단 (${actualSpeed})`);
                 }
             }
 
