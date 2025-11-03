@@ -11,79 +11,226 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 20px; overscroll-behavior: none;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            overscroll-behavior: none;
         }
+
         .container {
-            width: 100%; max-width: 420px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px);
-            border-radius: 30px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); padding: 30px;
+            width: 100%;
+            max-width: 420px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 30px;
         }
-        h1 { text-align: center; color: #667eea; margin-bottom: 20px; font-size: 1.8em; text-shadow: 2px 2px 4px rgba(0,0,0,0.1); }
-        .controls { display: flex; gap: 10px; margin-bottom: 15px; justify-content: center; flex-wrap: wrap; }
+
+        h1 {
+            text-align: center;
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
         button {
-            padding: 12px 20px; font-size: 15px; border: none; border-radius: 12px; cursor: pointer;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;
-            box-shadow: 0 4px 15px rgba(102,126,234,0.4); transition: all 0.3s ease; font-weight: 600;
+            padding: 12px 20px;
+            font-size: 15px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
+            font-weight: 600;
         }
-        button:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(102,126,234,0.6); }
-        button:disabled { background: #ccc; cursor: not-allowed; box-shadow: none; }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
         .video-container {
-            position: relative; width: 100%; max-width: 400px; margin: 0 auto 20px; border-radius: 20px;
-            overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto 20px;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
         }
-        video { display: none; }
-        canvas { width: 100%; display: block; }
+
+        video {
+            display: none;
+        }
+
+        canvas {
+            width: 100%;
+            display: block;
+        }
+
         .status-grid {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
             background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
-            border-radius: 20px; padding: 15px; margin-bottom: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border-radius: 20px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
         }
+
         .status-grid-item {
-            background: rgba(255,255,255,0.7); border-radius: 12px; padding: 12px; text-align: center;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
         }
-        .status-grid-label { font-size: 12px; font-weight: 600; color: #764ba2; margin-bottom: 5px; }
-        .status-grid-value { font-size: 16px; font-weight: 700; color: #667eea; }
+
+        .status-grid-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #764ba2;
+            margin-bottom: 5px;
+        }
+
+        .status-grid-value {
+            font-size: 16px;
+            font-weight: 700;
+            color: #667eea;
+        }
+
         .log-panel {
             background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
-            border-radius: 20px; padding: 20px; max-height: 200px; overflow-y: auto;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border-radius: 20px;
+            padding: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
         }
+
         .log-item {
-            padding: 8px 12px; margin-bottom: 6px; background: rgba(255,255,255,0.8);
-            border-radius: 10px; font-size: 13px; color: #555; border-left: 4px solid #667eea;
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 10px;
+            font-size: 13px;
+            color: #555;
+            border-left: 4px solid #667eea;
         }
-        .ble-status { text-align: center; padding: 12px; border-radius: 15px; margin-bottom: 15px; font-weight: 600; font-size: 15px; }
-        .ble-connected { background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%); color: #0f5132; }
-        .ble-disconnected { background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #842029; }
-        .footer { width: 100%; max-width: 400px; text-align: center; padding: 20px 0; margin-top: 20px; font-size: 0.75em; color: rgba(255,255,255,0.7); }
-        .footer hr { border: none; border-top: 1px solid rgba(255,255,255,0.2); margin: 15px 0; }
+
+        .ble-status {
+            text-align: center;
+            padding: 12px;
+            border-radius: 15px;
+            margin-bottom: 15px;
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        .ble-connected {
+            background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+            color: #0f5132;
+        }
+
+        .ble-disconnected {
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            color: #842029;
+        }
+
+        .footer {
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            padding: 20px 0;
+            margin-top: 20px;
+            font-size: 0.75em;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .footer hr {
+            border: none;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            margin: 15px 0;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>7🚗 RC Car Controller</h1>
+        <h1>6🚗 RC Car Controller</h1>
+        
         <div class="controls">
             <button id="connectBtn">BLE 연결</button>
             <button id="startBtn" disabled>카메라 시작</button>
         </div>
-        <div id="bleStatus" class="ble-status ble-disconnected">BLE 연결 안됨</div>
+
+        <div id="bleStatus" class="ble-status ble-disconnected">
+            BLE 연결 안됨
+        </div>
+
         <div class="video-container">
             <video id="videoElement" autoplay playsinline></video>
             <canvas id="canvasElement"></canvas>
         </div>
+
         <div class="status-grid">
-            <div class="status-grid-item"><div class="status-grid-label">모드</div><div class="status-grid-value" id="modeStatus">정지</div></div>
-            <div class="status-grid-item"><div class="status-grid-label">속도</div><div class="status-grid-value" id="speedStatus">0</div></div>
-            <div class="status-grid-item"><div class="status-grid-label">서보</div><div class="status-grid-value" id="servoStatus">대기</div></div>
-            <div class="status-grid-item"><div class="status-grid-label">거리</div><div class="status-grid-value" id="distanceStatus">0.00</div></div>
+            <div class="status-grid-item">
+                <div class="status-grid-label">모드</div>
+                <div class="status-grid-value" id="modeStatus">정지</div>
+            </div>
+            <div class="status-grid-item">
+                <div class="status-grid-label">속도</div>
+                <div class="status-grid-value" id="speedStatus">0</div>
+            </div>
+            <div class="status-grid-item">
+                <div class="status-grid-label">서보</div>
+                <div class="status-grid-value" id="servoStatus">대기</div>
+            </div>
+            <div class="status-grid-item">
+                <div class="status-grid-label">거리</div>
+                <div class="status-grid-value" id="distanceStatus">0.00</div>
+            </div>
         </div>
-        <div class="log-panel" id="logPanel"><div class="log-item">로그가 여기에 표시됩니다...</div></div>
+
+        <div class="log-panel" id="logPanel">
+            <div class="log-item">로그가 여기에 표시됩니다...</div>
+        </div>
     </div>
-    <div class="footer"><hr>2025 Teacher Jun, Dept. of Robotics Mechanical Design, Seoul Robotics Highschool</div>
+
+    <div class="footer">
+        <hr>
+        2025 Teacher Jun, Dept. of Robotics Mechanical Design, Seoul Robotics Highschool
+    </div>
 
     <script>
         let bleDevice = null;
@@ -91,27 +238,36 @@
         let camera = null;
         let pose = null;
         let faceMesh = null;
+        
         const video = document.getElementById('videoElement');
         const canvas = document.getElementById('canvasElement');
         const canvasCtx = canvas.getContext('2d');
+        
         let currentMode = 'stop';
         let currentSpeed = 0;
-        let faceResults = null;
-        let isLeftEyeClosed = false;
-        let isRightEyeClosed = false;
+        let lastCommand = '';
         let leftEyeClosedTime = 0;
         let rightEyeClosedTime = 0;
+        let isLeftEyeClosed = false;
+        let isRightEyeClosed = false;
+        let lastForwardTime = 0; 
 
+        // BLE 명령어
         const FORWARD_CMD = '8';
         const BACKWARD_CMD = '2';
         const STOP_CMD = '5';
-        const SPEED_1_CMD = '3';
-        const SPEED_DOWN_CMD = '1';
+        const SPEED_1_CMD = '3';  // 속도 증가
+        const SPEED_DOWN_CMD = '1';  // 속도 감소
         const SERVO_LEFT_CMD = '7';
         const SERVO_RIGHT_CMD = '9';
-        const FORWARD_DISTANCE_MIN = 0.3;
-        const FORWARD_DISTANCE_MAX = 0.9;
+
+        // 임계값
+        const FORWARD_DISTANCE_MIN = 0.3;  // 전진 시작 (1단)
+        const FORWARD_DISTANCE_MAX = 0.9;  // 최대 속도 (5단)
         const EYE_CLOSED_DURATION = 500;
+
+        // 속도 매핑 (1~5단)
+        const SPEED_VALUES = [0, 51, 102, 153, 204, 255];  // 0단, 1단~5단
 
         document.getElementById('connectBtn').addEventListener('click', connectBLE);
         document.getElementById('startBtn').addEventListener('click', startCamera);
@@ -122,13 +278,16 @@
                     acceptAllDevices: true,
                     optionalServices: ['00c0ffee-1234-1234-1234-123456789abc']
                 });
+
                 const server = await bleDevice.gatt.connect();
                 const service = await server.getPrimaryService('00c0ffee-1234-1234-1234-123456789abc');
                 bleCharacteristic = await service.getCharacteristic('00c0ffee-4321-4321-4321-cba987654321');
+
                 document.getElementById('bleStatus').textContent = 'BLE 연결됨: ' + bleDevice.name;
                 document.getElementById('bleStatus').className = 'ble-status ble-connected';
                 document.getElementById('startBtn').disabled = false;
                 addLog('BLE 연결 성공: ' + bleDevice.name);
+
                 bleDevice.addEventListener('gattserverdisconnected', () => {
                     addLog('BLE 연결 끊김');
                     document.getElementById('bleStatus').textContent = 'BLE 연결 끊김';
@@ -154,40 +313,194 @@
         }
 
         function startCamera() {
-            pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
-            pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, enableSegmentation: false, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-            faceMesh = new FaceMesh({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}` });
-            faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+            pose = new Pose({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+            });
+
+            pose.setOptions({
+                modelComplexity: 1,
+                smoothLandmarks: true,
+                enableSegmentation: false,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+
+            faceMesh = new FaceMesh({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+            });
+
+            faceMesh.setOptions({
+                maxNumFaces: 1,
+                refineLandmarks: true,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+
             pose.onResults(onPoseResults);
-            faceMesh.onResults((r) => faceResults = r);
-            camera = new Camera(video, { onFrame: async () => { await pose.send({ image: video }); await faceMesh.send({ image: video }); }, width: 480, height: 640 });
+            faceMesh.onResults(onFaceResults);
+
+            camera = new Camera(video, {
+                onFrame: async () => {
+                    await pose.send({ image: video });
+                    await faceMesh.send({ image: video });
+                },
+                width: 480,
+                height: 640
+            });
+
             camera.start();
             document.getElementById('startBtn').disabled = true;
             addLog('카메라 시작');
         }
 
+        let faceResults = null;
+        
+
+        function onFaceResults(results) {
+            faceResults = results;
+        }
+
         function onPoseResults(results) {
             if (video.videoWidth && video.videoHeight) {
-                canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
             }
-            canvasCtx.save(); canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
-            canvasCtx.translate(canvas.width, 0); canvasCtx.scale(-1, 1);
+
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+            canvasCtx.translate(canvas.width, 0);
+            canvasCtx.scale(-1, 1);
             canvasCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
             if (results.poseLandmarks) {
-                const leftWrist = { x: results.poseLandmarks[16].x, y: results.poseLandmarks[16].y - 0.05, visibility: results.poseLandmarks[16].visibility };
-                const rightWrist = { x: results.poseLandmarks[15].x, y: results.poseLandmarks[15].y - 0.05, visibility: results.poseLandmarks[15].visibility };
-                if (leftWrist.visibility > 0.5 && rightWrist.visibility > 0.5) processWristControl(leftWrist, rightWrist);
-                else if (currentMode !== 'stop') { sendBLECommand(STOP_CMD); currentMode = 'stop'; updateStatus('정지', 0); }
+                // 캔버스가 좌우 반전되어 있으므로 landmark도 반대로 사용
+                const leftWrist = {
+                    x: results.poseLandmarks[16].x,  // 오른손 좌표를 왼손으로
+                    y: results.poseLandmarks[16].y - 0.05,
+                    visibility: results.poseLandmarks[16].visibility
+                };
+                const rightWrist = {
+                    x: results.poseLandmarks[15].x,  // 왼손 좌표를 오른손으로
+                    y: results.poseLandmarks[15].y - 0.05,
+                    visibility: results.poseLandmarks[15].visibility
+                };
+
+                if (leftWrist.visibility > 0.5 && rightWrist.visibility > 0.5) {
+                    const isLeftOutOfBounds = leftWrist.x < 0 || leftWrist.x > 1 || leftWrist.y < 0 || leftWrist.y > 1;
+                    const isRightOutOfBounds = rightWrist.x < 0 || rightWrist.x > 1 || rightWrist.y < 0 || rightWrist.y > 1;
+                    
+                    if (isLeftOutOfBounds || isRightOutOfBounds) {
+                        if (currentMode !== 'stop') {
+                            sendBLECommand(STOP_CMD);
+                            currentMode = 'stop';
+                            updateStatus('정지', 0);
+                        }
+                    } else {
+                        drawPoint(canvasCtx, leftWrist, '#FF6B6B', 18);
+                        drawPoint(canvasCtx, rightWrist, '#4ECDC4', 18);
+
+                        const leftFistCanvas = {
+                            x: leftWrist.x * canvas.width,
+                            y: leftWrist.y * canvas.height
+                        };
+                        const rightFistCanvas = {
+                            x: rightWrist.x * canvas.width,
+                            y: rightWrist.y * canvas.height
+                        };
+
+                        canvasCtx.beginPath();
+                        canvasCtx.moveTo(leftFistCanvas.x, leftFistCanvas.y);
+                        canvasCtx.lineTo(rightFistCanvas.x, rightFistCanvas.y);
+                        canvasCtx.strokeStyle = '#667eea';
+                        canvasCtx.lineWidth = 4;
+                        canvasCtx.setLineDash([10, 5]);
+                        canvasCtx.stroke();
+                        canvasCtx.setLineDash([]);
+
+                        processWristControl(leftWrist, rightWrist);
+                    }
+                } else {
+                    if (currentMode !== 'stop') {
+                        sendBLECommand(STOP_CMD);
+                        currentMode = 'stop';
+                        updateStatus('정지', 0);
+                    }
+                }
             }
+
+            if (faceResults && faceResults.multiFaceLandmarks && faceResults.multiFaceLandmarks[0]) {
+                const landmarks = faceResults.multiFaceLandmarks[0];
+                
+                const leftEyeTop = landmarks[159];
+                const leftEyeBottom = landmarks[145];
+                const leftEyeLeft = landmarks[33];
+                const leftEyeRight = landmarks[133];
+
+                const rightEyeTop = landmarks[386];
+                const rightEyeBottom = landmarks[374];
+                const rightEyeLeft = landmarks[362];
+                const rightEyeRight = landmarks[263];
+
+                drawEye(canvasCtx, [leftEyeTop, leftEyeBottom, leftEyeLeft, leftEyeRight], '#FFD93D');
+                drawEye(canvasCtx, [rightEyeTop, rightEyeBottom, rightEyeLeft, rightEyeRight], '#95E1D3');
+
+                processEyeControl(
+                    leftEyeTop, leftEyeBottom, leftEyeLeft, leftEyeRight,
+                    rightEyeTop, rightEyeBottom, rightEyeLeft, rightEyeRight
+                );
+            }
+
             canvasCtx.restore();
         }
 
-        // === 수정된 부분: 속도명령 지연 추가 ===
-        function processWristControl(leftWrist, rightWrist) {
-            const distance = Math.sqrt(Math.pow(leftWrist.x - rightWrist.x, 2) + Math.pow(leftWrist.y - rightWrist.y, 2));
-            document.getElementById('distanceStatus').textContent = distance.toFixed(2);
-            const isCrossed = leftWrist.x > rightWrist.x;
+        function drawPoint(ctx, point, color, size) {
+            ctx.beginPath();
+            ctx.arc(point.x * canvas.width, point.y * canvas.height, size, 0, 2 * Math.PI);
+            ctx.fillStyle = color;
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(point.x * canvas.width - 3, point.y * canvas.height - 3, 6, 0, 2 * Math.PI);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(point.x * canvas.width, point.y * canvas.height, size, 0, 2 * Math.PI);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
 
+        function drawEye(ctx, points, color) {
+            const centerX = (points[0].x + points[3].x) / 2 * canvas.width;
+            const centerY = (points[0].y + points[3].y) / 2 * canvas.height;
+            
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 10, 0, 2 * Math.PI);
+            ctx.fillStyle = color;
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(centerX - 2, centerY - 2, 3, 0, 2 * Math.PI);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 10, 0, 2 * Math.PI);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+    
+        function processWristControl(leftWrist, rightWrist) {
+            const distance = Math.sqrt(
+                Math.pow(leftWrist.x - rightWrist.x, 2) +
+                Math.pow(leftWrist.y - rightWrist.y, 2)
+            );
+            document.getElementById('distanceStatus').textContent = distance.toFixed(2);
+    
+            const isCrossed = leftWrist.x > rightWrist.x;
+    
             if (isCrossed) {
                 if (currentMode !== 'backward') {
                     sendBLECommand(BACKWARD_CMD);
@@ -196,26 +509,93 @@
                     updateStatus('후진', 3);
                 }
             } else if (distance >= FORWARD_DISTANCE_MIN) {
-                const speedLevel = Math.min(5, Math.max(1, Math.floor(((distance - FORWARD_DISTANCE_MIN) / (FORWARD_DISTANCE_MAX - FORWARD_DISTANCE_MIN)) * 5) + 1));
+                const speedLevel = Math.min(5, Math.max(1, 
+                    Math.floor(((distance - FORWARD_DISTANCE_MIN) / (FORWARD_DISTANCE_MAX - FORWARD_DISTANCE_MIN)) * 5) + 1
+                ));
+    
                 if (currentMode !== 'forward') {
                     sendBLECommand(FORWARD_CMD);
                     currentMode = 'forward';
+                    lastForwardTime = Date.now();  // ✅ 전진 시각 기록
                 }
-                if (currentSpeed !== speedLevel) {
-                    const diff = speedLevel - currentSpeed;
-                    const stepCmd = diff > 0 ? SPEED_1_CMD : SPEED_DOWN_CMD;
-                    const steps = Math.abs(diff);
-                    for (let i = 0; i < steps; i++) {
-                        setTimeout(() => sendBLECommand(stepCmd), i * 200); // 0.2초 간격
+    
+                if (Date.now() - lastForwardTime > 300) { // ✅ 전진 후 0.3초 동안 속도 변경 금지
+                    if (currentSpeed !== speedLevel) {
+                        if (speedLevel > currentSpeed) {
+                            for (let i = currentSpeed; i < speedLevel; i++) {
+                                sendBLECommand(SPEED_1_CMD);
+                            }
+                        } else {
+                            for (let i = currentSpeed; i > speedLevel; i--) {
+                                sendBLECommand(SPEED_DOWN_CMD);
+                            }
+                        }
+                        currentSpeed = speedLevel;
+                        updateStatus('전진', speedLevel);
                     }
-                    currentSpeed = speedLevel;
-                    updateStatus('전진', speedLevel);
                 }
-            } else if (currentMode !== 'stop') {
-                sendBLECommand(STOP_CMD);
-                currentMode = 'stop';
-                currentSpeed = 0;
-                updateStatus('정지', 0);
+    
+            } else {
+                if (currentMode !== 'stop') {
+                    sendBLECommand(STOP_CMD);
+                    currentMode = 'stop';
+                    currentSpeed = 0;
+                    updateStatus('정지', 0);
+                }
+            }
+        }
+        function calculateEAR(eyeTop, eyeBottom, eyeLeft, eyeRight) {
+            const verticalDist = Math.sqrt(
+                Math.pow(eyeTop.x - eyeBottom.x, 2) +
+                Math.pow(eyeTop.y - eyeBottom.y, 2)
+            );
+            const horizontalDist = Math.sqrt(
+                Math.pow(eyeLeft.x - eyeRight.x, 2) +
+                Math.pow(eyeLeft.y - eyeRight.y, 2)
+            );
+            return verticalDist / horizontalDist;
+        }
+
+        function processEyeControl(leftTop, leftBottom, leftLeft, leftRight,
+                                   rightTop, rightBottom, rightLeft, rightRight) {
+            const leftEAR = calculateEAR(leftTop, leftBottom, leftLeft, leftRight);
+            const rightEAR = calculateEAR(rightTop, rightBottom, rightLeft, rightRight);
+
+            const EAR_THRESHOLD = 0.2;
+
+            const leftClosed = leftEAR < EAR_THRESHOLD;
+            const rightClosed = rightEAR < EAR_THRESHOLD;
+
+            const currentTime = Date.now();
+
+            if (leftClosed && !isLeftEyeClosed) {
+                isLeftEyeClosed = true;
+                leftEyeClosedTime = currentTime;
+            } else if (!leftClosed) {
+                isLeftEyeClosed = false;
+                leftEyeClosedTime = 0;
+            }
+
+            if (rightClosed && !isRightEyeClosed) {
+                isRightEyeClosed = true;
+                rightEyeClosedTime = currentTime;
+            } else if (!rightClosed) {
+                isRightEyeClosed = false;
+                rightEyeClosedTime = 0;
+            }
+
+            if (isLeftEyeClosed && (currentTime - leftEyeClosedTime) >= EYE_CLOSED_DURATION) {
+                sendBLECommand(SERVO_LEFT_CMD);
+                document.getElementById('servoStatus').textContent = '왼쪽';
+                isLeftEyeClosed = false;
+                leftEyeClosedTime = 0;
+            }
+
+            if (isRightEyeClosed && (currentTime - rightEyeClosedTime) >= EYE_CLOSED_DURATION) {
+                sendBLECommand(SERVO_RIGHT_CMD);
+                document.getElementById('servoStatus').textContent = '오른쪽';
+                isRightEyeClosed = false;
+                rightEyeClosedTime = 0;
             }
         }
 
@@ -231,7 +611,10 @@
             const timestamp = new Date().toLocaleTimeString();
             logItem.textContent = `[${timestamp}] ${message}`;
             logPanel.insertBefore(logItem, logPanel.firstChild);
-            while (logPanel.children.length > 20) logPanel.removeChild(logPanel.lastChild);
+
+            while (logPanel.children.length > 20) {
+                logPanel.removeChild(logPanel.lastChild);
+            }
         }
     </script>
 </body>
