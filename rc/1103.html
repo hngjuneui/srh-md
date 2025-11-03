@@ -2,7 +2,9 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>MediaPipe BLE RC Car Controller</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
@@ -13,6 +15,8 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
         }
 
         body {
@@ -23,11 +27,12 @@
             flex-direction: column;
             align-items: center;
             padding: 20px;
+            overscroll-behavior: none;
         }
 
         .container {
             width: 100%;
-            max-width: 1200px;
+            max-width: 420px;
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
             border-radius: 30px;
@@ -39,23 +44,23 @@
             text-align: center;
             color: #667eea;
             margin-bottom: 20px;
-            font-size: 2em;
+            font-size: 1.8em;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .controls {
             display: flex;
-            gap: 15px;
-            margin-bottom: 20px;
+            gap: 10px;
+            margin-bottom: 15px;
             justify-content: center;
             flex-wrap: wrap;
         }
 
         button {
-            padding: 12px 24px;
-            font-size: 16px;
+            padding: 12px 20px;
+            font-size: 15px;
             border: none;
-            border-radius: 15px;
+            border-radius: 12px;
             cursor: pointer;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -78,25 +83,20 @@
         .video-container {
             position: relative;
             width: 100%;
-            max-width: 800px;
+            max-width: 400px;
             margin: 0 auto 20px;
             border-radius: 20px;
             overflow: hidden;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
         }
 
-        #videoElement {
-            width: 100%;
-            display: block;
-            transform: scaleX(-1);
+        video {
+            display: none;
         }
 
-        #canvasElement {
-            position: absolute;
-            top: 0;
-            left: 0;
+        canvas {
             width: 100%;
-            height: 100%;
+            display: block;
             transform: scaleX(-1);
         }
 
@@ -177,7 +177,7 @@
         .legend {
             display: flex;
             justify-content: center;
-            gap: 20px;
+            gap: 15px;
             margin-bottom: 15px;
             flex-wrap: wrap;
         }
@@ -186,29 +186,44 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            padding: 8px 16px;
+            padding: 6px 12px;
             background: rgba(255, 255, 255, 0.8);
             border-radius: 12px;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 600;
         }
 
         .legend-color {
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             border-radius: 50%;
             border: 2px solid rgba(0, 0, 0, 0.2);
+        }
+
+        .footer {
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            padding: 20px 0;
+            margin-top: 20px;
+            font-size: 0.75em;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .footer hr {
+            border: none;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            margin: 15px 0;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🚗 MediaPipe BLE RC Car Controller</h1>
+        <h1>🚗 RC Car Controller</h1>
         
         <div class="controls">
             <button id="connectBtn">BLE 연결</button>
             <button id="startBtn" disabled>카메라 시작</button>
-            <button id="stopBtn" disabled>카메라 정지</button>
         </div>
 
         <div id="bleStatus" class="ble-status ble-disconnected">
@@ -263,6 +278,11 @@
         </div>
     </div>
 
+    <div class="footer">
+        <hr>
+        2025 Teacher Jun, Dept. of Robotics Mechanical Design, Seoul Robotics Highschool
+    </div>
+
     <script>
         let bleDevice = null;
         let bleCharacteristic = null;
@@ -281,6 +301,7 @@
         let rightEyeClosedTime = 0;
         let isLeftEyeClosed = false;
         let isRightEyeClosed = false;
+        let lastDistance = 0;
 
         const SPEED_INCREASE_CMD = '3';
         const SPEED_DECREASE_CMD = '1';
@@ -290,29 +311,38 @@
         const SERVO_LEFT_CMD = '7';
         const SERVO_RIGHT_CMD = '9';
         const BACKWARD_CMD = '2';
+        const FORWARD_CMD = '8';
 
         const ANGLE_DEADZONE = 15;
-        const DISTANCE_THRESHOLD = 0.15;
+        const STOP_THRESHOLD = 0.12;
+        const DEADZONE_THRESHOLD = 0.16;
         const EYE_CLOSED_DURATION = 500;
 
         document.getElementById('connectBtn').addEventListener('click', connectBLE);
         document.getElementById('startBtn').addEventListener('click', startCamera);
-        document.getElementById('stopBtn').addEventListener('click', stopCamera);
 
         async function connectBLE() {
             try {
                 bleDevice = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: ['0000ffe0-0000-1000-8000-00805f9b34fb'] }]
+                    acceptAllDevices: true,
+                    optionalServices: ['00c0ffee-1234-1234-1234-123456789abc']
                 });
 
                 const server = await bleDevice.gatt.connect();
-                const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
-                bleCharacteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
+                const service = await server.getPrimaryService('00c0ffee-1234-1234-1234-123456789abc');
+                bleCharacteristic = await service.getCharacteristic('00c0ffee-4321-4321-4321-cba987654321');
 
                 document.getElementById('bleStatus').textContent = 'BLE 연결됨: ' + bleDevice.name;
                 document.getElementById('bleStatus').className = 'ble-status ble-connected';
                 document.getElementById('startBtn').disabled = false;
-                addLog('BLE 기기 연결 성공');
+                addLog('BLE 기기 연결 성공: ' + bleDevice.name);
+
+                bleDevice.addEventListener('gattserverdisconnected', () => {
+                    addLog('BLE 연결 끊김');
+                    document.getElementById('bleStatus').textContent = 'BLE 연결 끊김';
+                    document.getElementById('bleStatus').className = 'ble-status ble-disconnected';
+                    bleCharacteristic = null;
+                });
             } catch (error) {
                 addLog('BLE 연결 실패: ' + error);
                 alert('BLE 연결 실패: ' + error);
@@ -323,7 +353,7 @@
             if (bleCharacteristic && command !== lastCommand) {
                 try {
                     const encoder = new TextEncoder();
-                    await bleCharacteristic.writeValue(encoder.encode(command));
+                    await bleCharacteristic.writeValue(encoder.encode(command + '\n'));
                     lastCommand = command;
                 } catch (error) {
                     console.error('BLE 전송 실패:', error);
@@ -339,6 +369,7 @@
             pose.setOptions({
                 modelComplexity: 1,
                 smoothLandmarks: true,
+                enableSegmentation: false,
                 minDetectionConfidence: 0.5,
                 minTrackingConfidence: 0.5
             });
@@ -362,25 +393,13 @@
                     await pose.send({ image: video });
                     await faceMesh.send({ image: video });
                 },
-                width: 640,
-                height: 480
+                width: 480,
+                height: 640
             });
 
             camera.start();
             document.getElementById('startBtn').disabled = true;
-            document.getElementById('stopBtn').disabled = false;
             addLog('카메라 시작됨');
-        }
-
-        function stopCamera() {
-            if (camera) {
-                camera.stop();
-                camera = null;
-            }
-            document.getElementById('startBtn').disabled = false;
-            document.getElementById('stopBtn').disabled = true;
-            sendBLECommand(STOP_CMD);
-            addLog('카메라 정지됨');
         }
 
         let faceResults = null;
@@ -390,15 +409,28 @@
         }
 
         function onPoseResults(results) {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
+            if (video.videoWidth && video.videoHeight) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+            }
 
             canvasCtx.save();
             canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+            canvasCtx.translate(canvas.width, 0);
+            canvasCtx.scale(-1, 1);
+            canvasCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             if (results.poseLandmarks) {
-                const leftWrist = results.poseLandmarks[15];
-                const rightWrist = results.poseLandmarks[16];
+                const leftWrist = {
+                    x: results.poseLandmarks[15].x,
+                    y: results.poseLandmarks[15].y - 0.05,
+                    visibility: results.poseLandmarks[15].visibility
+                };
+                const rightWrist = {
+                    x: results.poseLandmarks[16].x,
+                    y: results.poseLandmarks[16].y - 0.05,
+                    visibility: results.poseLandmarks[16].visibility
+                };
 
                 if (leftWrist.visibility > 0.5 && rightWrist.visibility > 0.5) {
                     if (leftWrist.x < 0 || leftWrist.x > 1 || leftWrist.y < 0 || leftWrist.y > 1 ||
@@ -407,8 +439,26 @@
                         updateStatus(0, 'straight', '정지');
                         addLog('주먹이 화면 밖 - 정지');
                     } else {
-                        drawPoint(canvasCtx, leftWrist, '#FF6B6B', 15);
-                        drawPoint(canvasCtx, rightWrist, '#4ECDC4', 15);
+                        drawPoint(canvasCtx, leftWrist, '#FF6B6B', 18);
+                        drawPoint(canvasCtx, rightWrist, '#4ECDC4', 18);
+
+                        const leftFistCanvas = {
+                            x: leftWrist.x * canvas.width,
+                            y: leftWrist.y * canvas.height
+                        };
+                        const rightFistCanvas = {
+                            x: rightWrist.x * canvas.width,
+                            y: rightWrist.y * canvas.height
+                        };
+
+                        canvasCtx.beginPath();
+                        canvasCtx.moveTo(leftFistCanvas.x, leftFistCanvas.y);
+                        canvasCtx.lineTo(rightFistCanvas.x, rightFistCanvas.y);
+                        canvasCtx.strokeStyle = '#667eea';
+                        canvasCtx.lineWidth = 4;
+                        canvasCtx.setLineDash([10, 5]);
+                        canvasCtx.stroke();
+                        canvasCtx.setLineDash([]);
 
                         processWristControl(leftWrist, rightWrist);
                     }
@@ -448,7 +498,15 @@
             ctx.arc(point.x * canvas.width, point.y * canvas.height, size, 0, 2 * Math.PI);
             ctx.fillStyle = color;
             ctx.fill();
-            ctx.strokeStyle = 'white';
+            
+            ctx.beginPath();
+            ctx.arc(point.x * canvas.width - 3, point.y * canvas.height - 3, 6, 0, 2 * Math.PI);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(point.x * canvas.width, point.y * canvas.height, size, 0, 2 * Math.PI);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
             ctx.lineWidth = 3;
             ctx.stroke();
         }
@@ -456,11 +514,19 @@
         function drawEye(ctx, points, color) {
             points.forEach(point => {
                 ctx.beginPath();
-                ctx.arc(point.x * canvas.width, point.y * canvas.height, 8, 0, 2 * Math.PI);
+                ctx.arc(point.x * canvas.width, point.y * canvas.height, 12, 0, 2 * Math.PI);
                 ctx.fillStyle = color;
                 ctx.fill();
-                ctx.strokeStyle = 'white';
-                ctx.lineWidth = 2;
+                
+                ctx.beginPath();
+                ctx.arc(point.x * canvas.width - 2, point.y * canvas.height - 2, 4, 0, 2 * Math.PI);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.arc(point.x * canvas.width, point.y * canvas.height, 12, 0, 2 * Math.PI);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.lineWidth = 2.5;
                 ctx.stroke();
             });
         }
@@ -479,59 +545,67 @@
             const isCrossed = leftWrist.x > rightWrist.x;
 
             if (isCrossed) {
-                sendBLECommand(BACKWARD_CMD);
-                updateStatus(3, 'straight', '후진');
-                addLog('후진 모드 (3단 고정)');
+                if (currentSpeed !== 3) {
+                    currentSpeed = 3;
+                    sendBLECommand(BACKWARD_CMD);
+                    updateStatus(3, 'straight', '후진');
+                    addLog('후진 모드 (3단 고정)');
+                }
                 return;
             }
 
-            if (distance < DISTANCE_THRESHOLD) {
+            if (distance < STOP_THRESHOLD || distance < DEADZONE_THRESHOLD) {
                 if (currentSpeed !== 0) {
                     sendBLECommand(STOP_CMD);
+                    currentSpeed = 0;
                     updateStatus(0, 'straight', '정지');
                     addLog('주먹 근접 - 정지');
                 }
                 return;
             }
 
-            let targetSpeed = Math.min(5, Math.floor(distance / 0.08) + 1);
-            
-            if (targetSpeed > currentSpeed) {
-                sendBLECommand(SPEED_INCREASE_CMD);
-                currentSpeed++;
-                updateStatus(currentSpeed, currentDirection, '전진');
-                addLog(`속도 증가: ${currentSpeed}단`);
-            } else if (targetSpeed < currentSpeed && currentSpeed > 1) {
-                sendBLECommand(SPEED_DECREASE_CMD);
-                currentSpeed--;
-                updateStatus(currentSpeed, currentDirection, '전진');
-                addLog(`속도 감소: ${currentSpeed}단`);
+            if (distance > lastDistance + 0.015) {
+                if (currentSpeed < 5) {
+                    sendBLECommand(SPEED_INCREASE_CMD);
+                    currentSpeed++;
+                    updateStatus(currentSpeed, currentDirection, '전진');
+                    addLog(`속도 증가: ${currentSpeed}단`);
+                }
+            } else if (distance < lastDistance - 0.015) {
+                if (currentSpeed > 1) {
+                    sendBLECommand(SPEED_DECREASE_CMD);
+                    currentSpeed--;
+                    updateStatus(currentSpeed, currentDirection, '전진');
+                    addLog(`속도 감소: ${currentSpeed}단`);
+                }
             }
 
+            lastDistance = distance;
+
             let newDirection = 'straight';
-            if (Math.abs(angle) > ANGLE_DEADZONE) {
-                if (angle > 0) {
-                    newDirection = 'left';
-                    if (currentDirection !== 'left') {
-                        sendBLECommand(LEFT_TURN_CMD);
-                        currentDirection = 'left';
-                        updateStatus(currentSpeed, currentDirection, '전진');
-                        addLog('좌회전');
-                    }
-                } else {
-                    newDirection = 'right';
-                    if (currentDirection !== 'right') {
-                        sendBLECommand(RIGHT_TURN_CMD);
-                        currentDirection = 'right';
-                        updateStatus(currentSpeed, currentDirection, '전진');
-                        addLog('우회전');
-                    }
-                }
-            } else {
+            if (Math.abs(angle) <= ANGLE_DEADZONE) {
+                newDirection = 'straight';
                 if (currentDirection !== 'straight') {
+                    sendBLECommand(FORWARD_CMD);
                     currentDirection = 'straight';
                     updateStatus(currentSpeed, currentDirection, '전진');
                     addLog('직진');
+                }
+            } else if (angle > ANGLE_DEADZONE) {
+                newDirection = 'left';
+                if (currentDirection !== 'left') {
+                    sendBLECommand(LEFT_TURN_CMD);
+                    currentDirection = 'left';
+                    updateStatus(currentSpeed, currentDirection, '전진');
+                    addLog('좌회전');
+                }
+            } else if (angle < -ANGLE_DEADZONE) {
+                newDirection = 'right';
+                if (currentDirection !== 'right') {
+                    sendBLECommand(RIGHT_TURN_CMD);
+                    currentDirection = 'right';
+                    updateStatus(currentSpeed, currentDirection, '전진');
+                    addLog('우회전');
                 }
             }
         }
@@ -553,7 +627,7 @@
             const leftEAR = calculateEAR(leftTop, leftBottom, leftLeft, leftRight);
             const rightEAR = calculateEAR(rightTop, rightBottom, rightLeft, rightRight);
 
-            const EAR_THRESHOLD = 0.15;
+            const EAR_THRESHOLD = 0.2;
 
             const leftClosed = leftEAR < EAR_THRESHOLD;
             const rightClosed = rightEAR < EAR_THRESHOLD;
