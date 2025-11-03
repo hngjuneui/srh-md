@@ -187,7 +187,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>4🚗 RC Car Controller</h1>
+        <h1>5🚗 RC Car Controller</h1>
         
         <div class="controls">
             <button id="connectBtn">BLE 연결</button>
@@ -365,15 +365,16 @@
             canvasCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             if (results.poseLandmarks) {
+                // 캔버스가 좌우 반전되어 있으므로 landmark도 반대로 사용
                 const leftWrist = {
-                    x: results.poseLandmarks[15].x,
-                    y: results.poseLandmarks[15].y - 0.05,
-                    visibility: results.poseLandmarks[15].visibility
-                };
-                const rightWrist = {
-                    x: results.poseLandmarks[16].x,
+                    x: results.poseLandmarks[16].x,  // 오른손 좌표를 왼손으로
                     y: results.poseLandmarks[16].y - 0.05,
                     visibility: results.poseLandmarks[16].visibility
+                };
+                const rightWrist = {
+                    x: results.poseLandmarks[15].x,  // 왼손 좌표를 오른손으로
+                    y: results.poseLandmarks[15].y - 0.05,
+                    visibility: results.poseLandmarks[15].visibility
                 };
 
                 if (leftWrist.visibility > 0.5 && rightWrist.visibility > 0.5) {
