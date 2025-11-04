@@ -187,7 +187,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>12🚗 RC Car Controller</h1>
+        <h1>RC Car Controller</h1>
         
         <div class="controls">
             <button id="connectBtn">BLE 연결</button>
@@ -549,25 +549,35 @@
 
                 let newDirection = 'straight';
                 if (Math.abs(angle) <= ANGLE_DEADZONE) {
+                    // 직진 (수평 근처)
                     newDirection = 'straight';
                     if (currentDirection !== 'straight') {
                         sendBLECommand(FORWARD_CMD);
                         currentDirection = 'straight';
                         updateStatus('전진', speedLevel);
                     }
-                } else if (angle > ANGLE_DEADZONE) {
+                } else if (angle > ANGLE_DEADZONE && angle < 90) {
+                    // 좌회전 (오른손이 아래, 각도가 양수이고 90도 미만)
                     newDirection = 'left';
                     if (currentDirection !== 'left') {
                         sendBLECommand(LEFT_TURN_CMD);
                         currentDirection = 'left';
                         updateStatus('전진(좌)', speedLevel);
                     }
-                } else if (angle < -ANGLE_DEADZONE) {
+                } else if (angle < -ANGLE_DEADZONE && angle > -90) {
+                    // 우회전 (왼손이 아래, 각도가 음수이고 -90도 초과)
                     newDirection = 'right';
                     if (currentDirection !== 'right') {
                         sendBLECommand(RIGHT_TURN_CMD);
                         currentDirection = 'right';
                         updateStatus('전진(우)', speedLevel);
+                    }
+                } else {
+                    // 각도가 너무 가파름 (90도 이상) - 직진 유지
+                    if (currentDirection !== 'straight') {
+                        sendBLECommand(FORWARD_CMD);
+                        currentDirection = 'straight';
+                        updateStatus('전진', speedLevel);
                     }
                 }
             } else {
