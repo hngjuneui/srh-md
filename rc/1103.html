@@ -187,7 +187,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>9🚗 RC Car Controller</h1>
+        <h1>10🚗 RC Car Controller</h1>
         
         <div class="controls">
             <button id="connectBtn">BLE 연결</button>
@@ -245,6 +245,7 @@
         
         let currentMode = 'stop';
         let currentSpeed = 0;
+        let currentDirection = 'straight';  // 'straight', 'left', 'right'
         let lastCommand = '';
         let leftEyeClosedTime = 0;
         let rightEyeClosedTime = 0;
@@ -257,12 +258,15 @@
         const STOP_CMD = '5';
         const SPEED_1_CMD = '3';  // 속도 증가
         const SPEED_DOWN_CMD = '1';  // 속도 감소
+        const LEFT_TURN_CMD = '4';  // 좌회전
+        const RIGHT_TURN_CMD = '6';  // 우회전
         const SERVO_LEFT_CMD = '7';
         const SERVO_RIGHT_CMD = '9';
 
         // 임계값
         const FORWARD_DISTANCE_MIN = 0.3;  // 전진 시작 (1단)
         const FORWARD_DISTANCE_MAX = 0.9;  // 최대 속도 (5단)
+        const ANGLE_DEADZONE = 15;  // 각도 데드존 (±15도는 직진)
         const EYE_CLOSED_DURATION = 500;
 
         // 속도 매핑 (1~5단)
@@ -503,7 +507,7 @@
 
             if (isCrossed) {
                 // 후진 - 3단 고정 (155)
-               if (currentMode !== 'backward') {
+                if (currentMode !== 'backward') {
                     // 먼저 속도를 3단으로 설정
                     sendBLECommand(STOP_CMD);      // '5' - 정지
                     sendBLECommand(SPEED_1_CMD);   // '3' - 1단
