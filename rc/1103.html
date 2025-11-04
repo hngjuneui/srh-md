@@ -262,11 +262,12 @@
         const RIGHT_TURN_CMD = '6';  // 우회전
         const SERVO_LEFT_CMD = '7';
         const SERVO_RIGHT_CMD = '9';
+        
 
         // 임계값
         const FORWARD_DISTANCE_MIN = 0.3;  // 전진 시작 (1단)
         const FORWARD_DISTANCE_MAX = 0.9;  // 최대 속도 (5단)
-        const ANGLE_DEADZONE = 15;  // 각도 데드존 (±15도는 직진)
+        const ANGLE_DEADZONE = 15;  // 각도 데드존 (±15도 이하는 직진)
         const EYE_CLOSED_DURATION = 500;
 
         // 속도 매핑 (1~5단)
@@ -528,6 +529,32 @@
                 if (currentMode !== 'forward') {
                     sendBLECommand(FORWARD_CMD);
                     currentMode = 'forward';
+                }
+                let newDirection = 'straight';
+                if (Math.abs(angle) <= ANGLE_DEADZONE) {
+                    // 직진 (데드존)
+                    newDirection = 'straight';
+                    if (currentDirection !== 'straight') {
+                        sendBLECommand(FORWARD_CMD);  // '8' 전송
+                        currentDirection = 'straight';
+                        updateStatus('전진', speedLevel);
+                    }
+                } else if (angle > ANGLE_DEADZONE) {
+                    // 좌회전 (오른손이 아래)
+                    newDirection = 'left';
+                    if (currentDirection !== 'left') {
+                        sendBLECommand(LEFT_TURN_CMD);  // '4' 전송
+                        currentDirection = 'left';
+                        updateStatus('전진(좌)', speedLevel);
+                    }
+                } else if (angle < -ANGLE_DEADZONE) {
+                    // 우회전 (왼손이 아래)
+                    newDirection = 'right';
+                    if (currentDirection !== 'right') {
+                        sendBLECommand(RIGHT_TURN_CMD);  // '6' 전송
+                        currentDirection = 'right';
+                        updateStatus('전진(우)', speedLevel);
+                    }
                 }
 
                 if (currentSpeed !== speedLevel) {
