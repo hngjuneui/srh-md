@@ -187,7 +187,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>7🚗 RC Car Controller</h1>
+        <h1>8🚗 RC Car Controller</h1>
         
         <div class="controls">
             <button id="connectBtn">BLE 연결</button>
@@ -502,12 +502,12 @@
             const isCrossed = leftWrist.x > rightWrist.x;
 
             if (isCrossed) {
-                // 후진 - 4단 고정 (206)
+                // 후진 - 3단 고정 (155)
                 if (currentMode !== 'backward') {
                     sendBLECommand(BACKWARD_CMD);
                     currentMode = 'backward';
-                    currentSpeed = 4;
-                    updateStatus('후진', 4);
+                    currentSpeed = 3;
+                    updateStatus('후진', 3);
                 }
             } else if (distance >= FORWARD_DISTANCE_MIN) {
                 // 전진 - 거리에 따라 1~5단
