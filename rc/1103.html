@@ -187,7 +187,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>11🚗 RC Car Controller</h1>
+        <h1>12🚗 RC Car Controller</h1>
         
         <div class="controls">
             <button id="connectBtn">BLE 연결</button>
@@ -245,7 +245,7 @@
         
         let currentMode = 'stop';
         let currentSpeed = 0;
-        let currentDirection = 'straight';  // 'straight', 'left', 'right'
+        let currentDirection = 'straight';
         let lastCommand = '';
         let leftEyeClosedTime = 0;
         let rightEyeClosedTime = 0;
@@ -256,22 +256,18 @@
         const FORWARD_CMD = '8';
         const BACKWARD_CMD = '2';
         const STOP_CMD = '5';
-        const SPEED_1_CMD = '3';  // 속도 증가
-        const SPEED_DOWN_CMD = '1';  // 속도 감소
-        const LEFT_TURN_CMD = '4';  // 좌회전
-        const RIGHT_TURN_CMD = '6';  // 우회전
+        const SPEED_1_CMD = '3';
+        const SPEED_DOWN_CMD = '1';
+        const LEFT_TURN_CMD = '4';
+        const RIGHT_TURN_CMD = '6';
         const SERVO_LEFT_CMD = '7';
         const SERVO_RIGHT_CMD = '9';
-        
 
         // 임계값
-        const FORWARD_DISTANCE_MIN = 0.3;  // 전진 시작 (1단)
-        const FORWARD_DISTANCE_MAX = 0.9;  // 최대 속도 (5단)
-        const ANGLE_DEADZONE = 15;  // 각도 데드존 (±15도 이하는 직진)
+        const FORWARD_DISTANCE_MIN = 0.3;
+        const FORWARD_DISTANCE_MAX = 0.9;
+        const ANGLE_DEADZONE = 15;
         const EYE_CLOSED_DURATION = 500;
-
-        // 속도 매핑 (1~5단)
-        const SPEED_VALUES = [0, 51, 102, 153, 204, 255];  // 0단, 1단~5단
 
         document.getElementById('connectBtn').addEventListener('click', connectBLE);
         document.getElementById('startBtn').addEventListener('click', startCamera);
@@ -376,14 +372,13 @@
             canvasCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             if (results.poseLandmarks) {
-                // 캔버스가 좌우 반전되어 있으므로 landmark도 반대로 사용
                 const leftWrist = {
-                    x: results.poseLandmarks[16].x,  // 오른손 좌표를 왼손으로
+                    x: results.poseLandmarks[16].x,
                     y: results.poseLandmarks[16].y - 0.05,
                     visibility: results.poseLandmarks[16].visibility
                 };
                 const rightWrist = {
-                    x: results.poseLandmarks[15].x,  // 왼손 좌표를 오른손으로
+                    x: results.poseLandmarks[15].x,
                     y: results.poseLandmarks[15].y - 0.05,
                     visibility: results.poseLandmarks[15].visibility
                 };
@@ -396,36 +391,42 @@
                         if (currentMode !== 'stop') {
                             sendBLECommand(STOP_CMD);
                             currentMode = 'stop';
+                            currentSpeed = 0;
+                            currentDirection = 'straight';
                             updateStatus('정지', 0);
                         }
-                    } else {
-                        drawPoint(canvasCtx, leftWrist, '#FF6B6B', 18);
-                        drawPoint(canvasCtx, rightWrist, '#4ECDC4', 18);
-
-                        const leftFistCanvas = {
-                            x: leftWrist.x * canvas.width,
-                            y: leftWrist.y * canvas.height
-                        };
-                        const rightFistCanvas = {
-                            x: rightWrist.x * canvas.width,
-                            y: rightWrist.y * canvas.height
-                        };
-
-                        canvasCtx.beginPath();
-                        canvasCtx.moveTo(leftFistCanvas.x, leftFistCanvas.y);
-                        canvasCtx.lineTo(rightFistCanvas.x, rightFistCanvas.y);
-                        canvasCtx.strokeStyle = '#667eea';
-                        canvasCtx.lineWidth = 4;
-                        canvasCtx.setLineDash([10, 5]);
-                        canvasCtx.stroke();
-                        canvasCtx.setLineDash([]);
-
-                        processWristControl(leftWrist, rightWrist);
+                        canvasCtx.restore();
+                        return;
                     }
+                    
+                    drawPoint(canvasCtx, leftWrist, '#FF6B6B', 18);
+                    drawPoint(canvasCtx, rightWrist, '#4ECDC4', 18);
+
+                    const leftFistCanvas = {
+                        x: leftWrist.x * canvas.width,
+                        y: leftWrist.y * canvas.height
+                    };
+                    const rightFistCanvas = {
+                        x: rightWrist.x * canvas.width,
+                        y: rightWrist.y * canvas.height
+                    };
+
+                    canvasCtx.beginPath();
+                    canvasCtx.moveTo(leftFistCanvas.x, leftFistCanvas.y);
+                    canvasCtx.lineTo(rightFistCanvas.x, rightFistCanvas.y);
+                    canvasCtx.strokeStyle = '#667eea';
+                    canvasCtx.lineWidth = 4;
+                    canvasCtx.setLineDash([10, 5]);
+                    canvasCtx.stroke();
+                    canvasCtx.setLineDash([]);
+
+                    processWristControl(leftWrist, rightWrist);
                 } else {
                     if (currentMode !== 'stop') {
                         sendBLECommand(STOP_CMD);
                         currentMode = 'stop';
+                        currentSpeed = 0;
+                        currentDirection = 'straight';
                         updateStatus('정지', 0);
                     }
                 }
@@ -501,27 +502,28 @@
                 Math.pow(leftWrist.y - rightWrist.y, 2)
             );
 
+            const angle = Math.atan2(
+                rightWrist.y - leftWrist.y,
+                rightWrist.x - leftWrist.x
+            ) * 180 / Math.PI;
+
             document.getElementById('distanceStatus').textContent = distance.toFixed(2);
 
-            // 손 교차 체크 (좌우 반전된 화면이므로 leftWrist.x > rightWrist.x가 교차)
             const isCrossed = leftWrist.x > rightWrist.x;
 
             if (isCrossed) {
-                // 후진 - 3단 고정 (155)
                 if (currentMode !== 'backward') {
-                    // 먼저 속도를 3단으로 설정
-                    sendBLECommand(STOP_CMD);      // '5' - 정지
-                    sendBLECommand(SPEED_1_CMD);   // '3' - 1단
-                    sendBLECommand(SPEED_1_CMD);   // '3' - 2단
-                    sendBLECommand(SPEED_1_CMD);   // '3' - 3단
-                    sendBLECommand(BACKWARD_CMD);  // '2' - 후진 시작
+                    sendBLECommand(STOP_CMD);
+                    sendBLECommand(SPEED_1_CMD);
+                    sendBLECommand(SPEED_1_CMD);
+                    sendBLECommand(SPEED_1_CMD);
+                    sendBLECommand(BACKWARD_CMD);
                     currentMode = 'backward';
                     currentSpeed = 3;
+                    currentDirection = 'straight';
                     updateStatus('후진', 3);
                 }
             } else if (distance >= FORWARD_DISTANCE_MIN) {
-                // 전진 - 거리에 따라 1~5단
-                // 0.3 ~ 0.9 사이를 1~5단으로 매핑
                 const speedLevel = Math.min(5, Math.max(1, 
                     Math.floor(((distance - FORWARD_DISTANCE_MIN) / (FORWARD_DISTANCE_MAX - FORWARD_DISTANCE_MIN)) * 5) + 1
                 ));
@@ -530,42 +532,13 @@
                     sendBLECommand(FORWARD_CMD);
                     currentMode = 'forward';
                 }
-                let newDirection = 'straight';
-                if (Math.abs(angle) <= ANGLE_DEADZONE) {
-                    // 직진 (데드존)
-                    newDirection = 'straight';
-                    if (currentDirection !== 'straight') {
-                        sendBLECommand(FORWARD_CMD);  // '8' 전송
-                        currentDirection = 'straight';
-                        updateStatus('전진', speedLevel);
-                    }
-                } else if (angle > ANGLE_DEADZONE) {
-                    // 좌회전 (오른손이 아래)
-                    newDirection = 'left';
-                    if (currentDirection !== 'left') {
-                        sendBLECommand(LEFT_TURN_CMD);  // '4' 전송
-                        currentDirection = 'left';
-                        updateStatus('전진(좌)', speedLevel);
-                    }
-                } else if (angle < -ANGLE_DEADZONE) {
-                    // 우회전 (왼손이 아래)
-                    newDirection = 'right';
-                    if (currentDirection !== 'right') {
-                        sendBLECommand(RIGHT_TURN_CMD);  // '6' 전송
-                        currentDirection = 'right';
-                        updateStatus('전진(우)', speedLevel);
-                    }
-                }
 
                 if (currentSpeed !== speedLevel) {
-                    // 속도 변경
                     if (speedLevel > currentSpeed) {
-                        // 속도 증가
                         for (let i = currentSpeed; i < speedLevel; i++) {
                             sendBLECommand(SPEED_1_CMD);
                         }
                     } else {
-                        // 속도 감소
                         for (let i = currentSpeed; i > speedLevel; i--) {
                             sendBLECommand(SPEED_DOWN_CMD);
                         }
@@ -573,12 +546,36 @@
                     currentSpeed = speedLevel;
                     updateStatus('전진', speedLevel);
                 }
+
+                let newDirection = 'straight';
+                if (Math.abs(angle) <= ANGLE_DEADZONE) {
+                    newDirection = 'straight';
+                    if (currentDirection !== 'straight') {
+                        sendBLECommand(FORWARD_CMD);
+                        currentDirection = 'straight';
+                        updateStatus('전진', speedLevel);
+                    }
+                } else if (angle > ANGLE_DEADZONE) {
+                    newDirection = 'left';
+                    if (currentDirection !== 'left') {
+                        sendBLECommand(LEFT_TURN_CMD);
+                        currentDirection = 'left';
+                        updateStatus('전진(좌)', speedLevel);
+                    }
+                } else if (angle < -ANGLE_DEADZONE) {
+                    newDirection = 'right';
+                    if (currentDirection !== 'right') {
+                        sendBLECommand(RIGHT_TURN_CMD);
+                        currentDirection = 'right';
+                        updateStatus('전진(우)', speedLevel);
+                    }
+                }
             } else {
-                // 정지
                 if (currentMode !== 'stop') {
                     sendBLECommand(STOP_CMD);
                     currentMode = 'stop';
                     currentSpeed = 0;
+                    currentDirection = 'straight';
                     updateStatus('정지', 0);
                 }
             }
