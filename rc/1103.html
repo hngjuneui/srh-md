@@ -187,7 +187,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>8🚗 RC Car Controller</h1>
+        <h1>9🚗 RC Car Controller</h1>
         
         <div class="controls">
             <button id="connectBtn">BLE 연결</button>
@@ -503,8 +503,13 @@
 
             if (isCrossed) {
                 // 후진 - 3단 고정 (155)
-                if (currentMode !== 'backward') {
-                    sendBLECommand(BACKWARD_CMD);
+               if (currentMode !== 'backward') {
+                    // 먼저 속도를 3단으로 설정
+                    sendBLECommand(STOP_CMD);      // '5' - 정지
+                    sendBLECommand(SPEED_1_CMD);   // '3' - 1단
+                    sendBLECommand(SPEED_1_CMD);   // '3' - 2단
+                    sendBLECommand(SPEED_1_CMD);   // '3' - 3단
+                    sendBLECommand(BACKWARD_CMD);  // '2' - 후진 시작
                     currentMode = 'backward';
                     currentSpeed = 3;
                     updateStatus('후진', 3);
